@@ -42,7 +42,7 @@
 | T-29 | Hooks bonus fields (duration_ms, tool_use_id, source, success) + dedup tool_use_id 우선 |
 | T-30 | MCP token migration 예약 |
 
-## T-32A ~ T-37 (Stage 1 자율 빌드)
+## T-32A ~ T-38 (Stage 1 자율 빌드 + deny 라이프사이클)
 
 | ID | 결정 1줄 |
 |----|----------|
@@ -55,6 +55,7 @@
 | T-35 | 모니터링 = BetterStack 잠정; DataDog 재평가 Phase O D+46 |
 | T-36 | 페르소나 cadence — 분기 인간 + 월 LLM-as-Judge |
 | T-37 | 게이트 자동 — B-1·B-2·M2 자동; M1·M3·M4 사용자 어드민 |
+| T-38 | settings.json deny 라이프사이클(pre/post/phase-out) 정합. Globbed 패턴 우선 |
 
 ## Non-decisions (자주 헷갈리는 것)
 

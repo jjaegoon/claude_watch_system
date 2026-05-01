@@ -67,20 +67,16 @@
       "Bash(mkfs*)",
       "Write(.env)",
       "Write(.env.*)",
-      "Write(./packages/db/migrations/001*.sql)",
-      "Write(./packages/db/migrations/002*.sql)",
-      "Write(./packages/db/migrations/003*.sql)",
-      "Write(./packages/db/migrations/004*.sql)",
-      "Write(./packages/db/migrations/005*.sql)",
-      "Write(./packages/db/migrations/006*.sql)",
-      "Write(./packages/db/migrations/007*.sql)",
       "Edit(./packages/db/migrations/001*.sql)",
       "Edit(./packages/db/migrations/002*.sql)",
       "Edit(./packages/db/migrations/003*.sql)",
       "Edit(./packages/db/migrations/004*.sql)",
       "Edit(./packages/db/migrations/005*.sql)",
       "Edit(./packages/db/migrations/006*.sql)",
-      "Edit(./packages/db/migrations/007*.sql)"
+      "Edit(./packages/db/migrations/007*.sql)",
+      "Write(./packages/db/migrations/00[1-9]*.sql)",
+      "Edit(./packages/db/migrations/008*.sql)",
+      "Edit(./packages/db/migrations/009*.sql)"
     ]
   },
   "hooks": {
@@ -88,7 +84,10 @@
       {
         "matcher": "Edit|Write",
         "hooks": [
-          { "type": "command", "command": "$HOME/.claude/team-hooks/precheck-plan.sh" }
+          {
+            "type": "command",
+            "command": "$HOME/.claude/team-hooks/precheck-plan.sh"
+          }
         ]
       }
     ],
@@ -105,21 +104,30 @@
       {
         "matcher": "*",
         "hooks": [
-          { "type": "command", "command": "$HOME/.claude/team-hooks/send-event.sh tool_call" }
+          {
+            "type": "command",
+            "command": "$HOME/.claude/team-hooks/send-event.sh tool_call"
+          }
         ]
       }
     ],
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "$HOME/.claude/team-hooks/send-event.sh session_start" }
+          {
+            "type": "command",
+            "command": "$HOME/.claude/team-hooks/send-event.sh session_start"
+          }
         ]
       }
     ],
     "Stop": [
       {
         "hooks": [
-          { "type": "command", "command": "$HOME/.claude/team-hooks/send-event.sh session_end" }
+          {
+            "type": "command",
+            "command": "$HOME/.claude/team-hooks/send-event.sh session_end"
+          }
         ]
       }
     ]
