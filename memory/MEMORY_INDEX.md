@@ -20,6 +20,7 @@
 
 직전 5개 에피소드만 자동 임포트. 6개 이상 누적 시 오래된 것은 archive.
 
+@./episodes/2026-05-02_M1_Step0.md
 @./episodes/2026-05-02_Stage2-fix.md
 @./episodes/2026-05-02_B-1.md
 @./episodes/2026-05-02_Stage2.md
