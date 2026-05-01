@@ -1,0 +1,11 @@
+{
+  "name": "team-claude-system",
+  "private": true,
+  "scripts": {
+    "dev":     "pnpm --parallel -r dev",
+    "build":   "pnpm -r build",
+    "migrate": "pnpm --filter @team-claude/db migrate",
+    "seed":    "pnpm --filter @team-claude/db seed",
+    "sync":    "pnpm --filter @team-claude/api sync"
+  }
+}

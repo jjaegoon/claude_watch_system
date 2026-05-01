@@ -1,0 +1,59 @@
+{
+  "$schema": "evals/golden_set/_schema.md",
+  "decision_refs": ["T-14", "T-23", "T-32A"],
+  "description": "Skill 도구 호출 시 server-side 매핑 — register / unregister / rename 시나리오.",
+  "cases": [
+    {
+      "id": "skill-trigger-registered",
+      "scenario": "등록된 Skill 호출 → asset_id 정확 매핑",
+      "given": {
+        "db_seed": { "assets": [{ "id": "asset_1", "name": "anthropic-skills:pdf", "type": "skill" }] },
+        "stdin_json": {
+          "tool_name": "Skill",
+          "tool_use_id": "toolu_skill_01",
+          "tool_input": { "metadata": { "skill_name": "anthropic-skills:pdf" } },
+          "duration_ms": 12,
+          "success": true
+        }
+      },
+      "expected": {
+        "db_after": { "usage_events": 1, "asset_id": "asset_1", "tool_name": "Skill" }
+      },
+      "decision": "T-14"
+    },
+    {
+      "id": "skill-trigger-unregistered",
+      "scenario": "미등록 Skill 호출 → asset_id NULL, event 정상 기록 (T-32A scenario_tag)",
+      "given": {
+        "db_seed": { "assets": [] },
+        "stdin_json": {
+          "tool_name": "Skill",
+          "tool_use_id": "toolu_skill_02",
+          "tool_input": { "metadata": { "skill_name": "user/custom-skill" } }
+        }
+      },
+      "expected": {
+        "db_after": { "usage_events": 1, "asset_id": null, "tool_name": "Skill" },
+        "scenario_tag_branch": "unregistered",
+        "decision_ref": "T-32A — KPI3 scenario_tag = tool_use_id 분기 ≥2종 (registered/unregistered)"
+      },
+      "decision": "T-32A"
+    },
+    {
+      "id": "skill-trigger-rename-stale-cache",
+      "scenario": "Skill name 변경 후 호출 → 새 이름 기반 매핑 (캐시 무효화)",
+      "given": {
+        "db_state_before": { "assets": [{ "id": "asset_3", "name": "old-skill-name", "type": "skill" }] },
+        "step1": "PATCH /assets/asset_3 { name: 'new-skill-name' }",
+        "step2": "Skill 호출 with metadata.skill_name='new-skill-name'",
+        "step3": "Skill 호출 with metadata.skill_name='old-skill-name' (legacy)"
+      },
+      "expected": {
+        "step2": { "asset_id": "asset_3", "matched_by": "name=new-skill-name" },
+        "step3": { "asset_id": null, "matched_by": "no asset" },
+        "note": "Skill rename은 ⓘ rename 직후 일정 기간 legacy 호출이 unregistered로 기록됨 (운영 인지)"
+      },
+      "decision": "T-14"
+    }
+  ]
+}

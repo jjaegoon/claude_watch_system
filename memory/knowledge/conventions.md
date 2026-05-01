@@ -1,0 +1,70 @@
+# Conventions — 코드 스타일·작성 규칙
+
+CLAUDE.md (Obsidian 프로젝트 디렉터리)의 코드 스타일을 압축.
+
+## TypeScript
+
+- **strict 모드 필수** (tsconfig: strict, noUncheckedIndexedAccess, noImplicitAny)
+- `any` 금지. `unknown` + 명시적 narrowing 사용
+- `console.log` 금지 (개발 중 임시 OK, commit 전 제거). Logger는 `pino` 또는 직접 정의 wrapper
+- export 함수·타입은 JSDoc 주석 (1-2줄, why-only)
+- 라우트 핸들러는 `apps/api/src/routes/*.ts`에만, middleware는 `apps/api/src/middleware/*.ts`
+- 스키마는 `packages/db/src/schema.ts` 단일 출처
+- Zod 검증기는 `apps/api/src/schemas/` (asset.ts, auth.ts 등)
+
+## API 응답 형식
+
+```
+{ "ok": true, "data": {...} }   // success
+{ "ok": false, "error": { "code": "STR", "message": "..." } }   // failure
+```
+
+코드는 SCREAMING_SNAKE_CASE (예: `INVALID_INPUT`, `RATE_LIMITED`).
+
+## 마이그레이션 (packages/db/migrations/)
+
+- 파일명: `XXX_description.sql` (3자리 zero-pad)
+- 001~007: 직접 수정 금지 (settings.json deny). 새 변경은 008+
+- 항상 idempotent: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`
+- FTS5 트리거는 마이그레이션과 함께 (T-19)
+
+## React (apps/web)
+
+- React 18, TanStack Query v5, React Router v6
+- Context + useReducer (Zustand 금지 — T-21)
+- Auth: access_token Context memory, refresh httpOnly cookie
+- Form 컴포넌트: discriminated union via TYPE_FIELD_COMPONENTS (T-22)
+- API 호출 wrapper: `apps/web/src/lib/apiClient.ts` (401 → refresh → retry → logout)
+
+## 커밋 메시지
+
+- 헤더: `[T-XX] verb 짧은 설명` 또는 `[Stage2] ...`, `[B-1] ...`
+- 본문: WHY 중심 (WHAT은 diff에서 보임)
+- 결정 ID는 항상 commit 메시지 또는 PR 본문에 명시
+- `Co-Authored-By: Claude Opus 4.7 (1M context) <noreply@anthropic.com>` 추가 (Claude Code 사용 시)
+
+## 브랜치
+
+- `main` 직접 push 금지 (settings.json deny — local commit OK)
+- 기능 작업: `feature/T-XX-short-description`
+- 버그 수정: `fix/issue-description`
+- worktree 사용 시: `~/team_claude_system_worktrees/T-XX-short-description`
+
+## 테스트
+
+- Unit: 같은 디렉터리 `*.test.ts`
+- Integration: `apps/api/src/__tests__/integration/*.test.ts`
+- Eval (Critical path): `evals/runners/*.test.ts` 소비 `evals/golden_set/*.json`
+- E2E (M2+): `apps/api/test/e2e/*.test.ts`
+
+## 문서
+
+- 모든 신규 파일/디렉터리 → 동일 PR에 `00_INDEX.md` 또는 적합한 INDEX 갱신 (GR-7)
+- Korean Obsidian docs 경로: `/Users/jjaegoon/Documents/Claude/Projects/Obsidian/01_Projects/Team-Claude-System/`
+- 새 결정은 04_시스템설계/ 적합 파일에 round로 추가 (T-13~T-30 변경 X)
+
+## Asset (SKILL/Prompt/Command/MCP)
+
+- SKILL.md curl Tracking 섹션 제거 (T-14: Hook 기반 자동 검출)
+- 등록은 페르소나 리뷰 후 INDEX 등록 (GR-2, GR-7)
+- 자산 repo: `team-claude-assets` (별도 repo, ASSETS_REPO_PATH env)

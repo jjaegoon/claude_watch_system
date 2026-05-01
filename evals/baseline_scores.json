@@ -1,0 +1,11 @@
+{
+  "version": 0,
+  "established_at": "2026-05-02T00:00:00Z",
+  "note": "Initial Stage 2 baseline. Scores are 0-1 (pass rate). Updated each milestone via regression_test.py --update or llm_judge_monthly.py.",
+  "scores": {
+    "auth": 1.0,
+    "hooks_receive": 1.0,
+    "fts5_search": 1.0,
+    "skill_trigger": 1.0
+  }
+}

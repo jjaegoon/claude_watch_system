@@ -1,0 +1,95 @@
+{
+  "$schema": "evals/golden_set/_schema.md",
+  "decision_refs": ["T-19", "T-27"],
+  "description": "FTS5 검색 5 케이스 + buildFts5Query input sanitization (한국어 unicode61 baseline).",
+  "cases": [
+    {
+      "id": "fts5-basic-keyword",
+      "scenario": "단일 키워드 검색",
+      "given": {
+        "request": "GET /assets?q=react",
+        "db_seed": [
+          { "name": "react-form", "type": "skill", "description": "React form helper" },
+          { "name": "vue-form", "type": "skill", "description": "Vue form helper" }
+        ]
+      },
+      "expected": {
+        "status": 200,
+        "body": { "ok": true, "data": { "items": [{ "name": "react-form" }] } }
+      },
+      "decision": "T-19"
+    },
+    {
+      "id": "fts5-tags-array",
+      "scenario": "JSON tags 배열 검색 (json_each 트리거)",
+      "given": {
+        "request": "GET /assets?q=auth",
+        "db_seed": [
+          { "name": "login-form", "tags": ["auth", "react"] },
+          { "name": "card-form", "tags": ["payment"] }
+        ]
+      },
+      "expected": {
+        "matches": ["login-form"]
+      },
+      "decision": "T-19"
+    },
+    {
+      "id": "fts5-hyphen-sanitize",
+      "scenario": "하이픈 포함 검색어 — buildFts5Query가 이스케이프",
+      "given": {
+        "raw_query": "react-form",
+        "after_sanitization": "\"react-form\"",
+        "request": "GET /assets?q=react-form"
+      },
+      "expected": {
+        "no_fts5_syntax_error": true,
+        "matches": ["react-form"]
+      },
+      "decision": "T-27"
+    },
+    {
+      "id": "fts5-reserved-word-AND",
+      "scenario": "예약어 AND/OR/NOT 사용자 입력 → 이스케이프",
+      "given": {
+        "raw_query": "auth AND form",
+        "after_sanitization": "\"auth AND form\"",
+        "request": "GET /assets?q=auth%20AND%20form"
+      },
+      "expected": {
+        "treated_as_phrase": true,
+        "no_fts5_syntax_error": true
+      },
+      "decision": "T-27"
+    },
+    {
+      "id": "fts5-korean-baseline",
+      "scenario": "한국어 단어 검색 (unicode61)",
+      "given": {
+        "raw_query": "인증",
+        "db_seed": [
+          { "name": "auth-skill", "description": "인증 헬퍼" },
+          { "name": "form-skill", "description": "폼 헬퍼" }
+        ]
+      },
+      "expected": {
+        "matches": ["auth-skill"],
+        "note_approximation": "ℹ️ unicode61은 형태소 분석 X, 음절 단위 baseline (T-19)"
+      },
+      "decision": "T-19"
+    },
+    {
+      "id": "fts5-empty-query",
+      "scenario": "빈 검색어 → 전체 페이지네이션 응답",
+      "given": {
+        "request": "GET /assets?q="
+      },
+      "expected": {
+        "status": 200,
+        "body_kind": "paginated_list",
+        "no_fts5_invocation": true
+      },
+      "decision": "T-19"
+    }
+  ]
+}

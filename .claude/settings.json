@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "model": "claude-sonnet-4-6",
+  "permissions": {
+    "allow": [
+      "Bash(pnpm install)",
+      "Bash(pnpm test*)",
+      "Bash(pnpm build*)",
+      "Bash(pnpm typecheck*)",
+      "Bash(pnpm dev*)",
+      "Bash(pnpm migrate*)",
+      "Bash(pnpm seed*)",
+      "Bash(pnpm sync*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git checkout*)",
+      "Bash(git diff*)",
+      "Bash(git log*)",
+      "Bash(git status*)",
+      "Bash(git branch*)",
+      "Bash(git stash*)",
+      "Bash(git push origin feature/*)",
+      "Bash(git push origin fix/*)",
+      "Bash(jq *)",
+      "Bash(node *)",
+      "Bash(bash hooks/*)",
+      "Bash(bash install.sh)",
+      "Bash(bash evals/*)",
+      "Bash(bash test/*)",
+      "Bash(sqlite3 data/*)",
+      "Read(./**)",
+      "Read(/Users/jjaegoon/.claude/team-hooks/**)",
+      "Read(/Users/jjaegoon/.claude/plans/**)",
+      "Read(/Users/jjaegoon/Documents/Claude/Projects/Obsidian/01_Projects/Team-Claude-System/**)",
+      "Write(./apps/*/src/**)",
+      "Write(./packages/*/src/**)",
+      "Write(./evals/**)",
+      "Write(./memory/**)",
+      "Write(./hooks/**)",
+      "Write(./test/**)",
+      "Write(./.github/**)",
+      "Edit(./apps/*/src/**)",
+      "Edit(./packages/*/src/**)",
+      "Edit(./evals/**)",
+      "Edit(./memory/**)",
+      "Edit(./hooks/**)",
+      "Edit(./test/**)",
+      "Edit(./.github/**)"
+    ],
+    "deny": [
+      "Bash(rm -rf /)",
+      "Bash(rm -rf ~)",
+      "Bash(rm -rf *)",
+      "Bash(rm -rf /*)",
+      "Bash(curl * | bash)",
+      "Bash(curl * | sh)",
+      "Bash(wget * | bash)",
+      "Bash(wget * | sh)",
+      "Bash(git push origin main*)",
+      "Bash(git push origin master*)",
+      "Bash(git push --force*)",
+      "Bash(git push -f *)",
+      "Bash(chmod 0*)",
+      "Bash(chmod -R 000*)",
+      "Bash(chmod 777 *)",
+      "Bash(dd if=*)",
+      "Bash(mkfs*)",
+      "Write(.env)",
+      "Write(.env.*)",
+      "Write(./packages/db/migrations/001*.sql)",
+      "Write(./packages/db/migrations/002*.sql)",
+      "Write(./packages/db/migrations/003*.sql)",
+      "Write(./packages/db/migrations/004*.sql)",
+      "Write(./packages/db/migrations/005*.sql)",
+      "Write(./packages/db/migrations/006*.sql)",
+      "Write(./packages/db/migrations/007*.sql)",
+      "Edit(./packages/db/migrations/001*.sql)",
+      "Edit(./packages/db/migrations/002*.sql)",
+      "Edit(./packages/db/migrations/003*.sql)",
+      "Edit(./packages/db/migrations/004*.sql)",
+      "Edit(./packages/db/migrations/005*.sql)",
+      "Edit(./packages/db/migrations/006*.sql)",
+      "Edit(./packages/db/migrations/007*.sql)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/team-hooks/precheck-plan.sh" }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "F=$(jq -r '.tool_input.file_path // empty'); case \"$F\" in *.ts|*.tsx|*.mts|*.cts) timeout 60 sh -c 'cd \"$(git rev-parse --show-toplevel)\" 2>/dev/null && pnpm typecheck 2>&1 | tail -10' ;; esac || true"
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/team-hooks/send-event.sh tool_call" }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/team-hooks/send-event.sh session_start" }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          { "type": "command", "command": "$HOME/.claude/team-hooks/send-event.sh session_end" }
+        ]
+      }
+    ]
+  }
+}

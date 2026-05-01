@@ -1,0 +1,179 @@
+# claude-review.yml — T-34 Review bot 워크플로.
+#
+# 활성화 시점: D+29 (M3 진입 시 ANTHROPIC_API_KEY 발급 후).
+# 그 이전: workflow_dispatch만 가능 (수동 dry-run). PR 자동 트리거는 비활성.
+#
+# 5축 검사 (T-34):
+#   1. INDEX consistency (GR-7) — 신규 파일 + INDEX 갱신
+#   2. Decision ID xref — [T-XX] in commit + 결정 출처 in body
+#   3. Plan mode trace — plan 파일 또는 commit self-check 동봉
+#   4. §5.4 자가점검 — precommit-check.sh JSON 첨부
+#   5. Blocklist 9 bypass — staged diff 패턴 매칭 = 0
+
+name: claude-review
+
+on:
+  # PR 자동 트리거 — D+29 활성화 후 아래 주석 해제.
+  # pull_request:
+  #   types: [opened, synchronize, reopened]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number to review (manual dry-run)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  pull-requests: write
+
+env:
+  # ANTHROPIC_API_KEY는 GitHub Secrets에서 주입. M3 진입 시 사용자 발급 후 등록.
+  # 미발급 단계에서는 워크플로 실행 시 ANTHROPIC_API_KEY 누락 → 명시적 실패.
+  ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+
+jobs:
+  pre-flight:
+    name: Pre-flight (D+29 activation gate)
+    runs-on: ubuntu-latest
+    outputs:
+      activated: ${{ steps.check.outputs.activated }}
+    steps:
+      - id: check
+        name: Check activation eligibility
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          if [ -z "$ANTHROPIC_API_KEY" ]; then
+            echo "::warning::ANTHROPIC_API_KEY not set — review bot in dry-run mode (T-33 phased activation)"
+            echo "activated=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "activated=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  five-axis-check:
+    name: 5-axis review (Claude)
+    needs: pre-flight
+    if: needs.pre-flight.outputs.activated == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm + Node
+        uses: pnpm/action-setup@v3
+        with:
+          version: 9
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Axis 1 — INDEX consistency (GR-7)
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: |
+          NEW_FILES=$(git diff --name-only --diff-filter=A "$BASE_SHA"...HEAD | grep -v -E "(00_INDEX|MEMORY_INDEX|memory/episodes/)" || true)
+          INDEX_CHANGED=$(git diff --name-only "$BASE_SHA"...HEAD | grep -E "(00_INDEX|MEMORY_INDEX|^CLAUDE\.md$)" || true)
+          if [ -n "$NEW_FILES" ] && [ -z "$INDEX_CHANGED" ]; then
+            echo "::error::Axis 1 FAIL: new files added without INDEX update (GR-7)"
+            echo "$NEW_FILES" | sed 's/^/  - /'
+            exit 1
+          fi
+
+      - name: Axis 2 — Decision ID cross-reference
+        env:
+          # SECURITY: route untrusted PR title/body through env vars, never expression interpolation in `run:`.
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: |
+          MSG="$PR_TITLE $PR_BODY"
+          TOUCHED=$(git diff --name-only "$BASE_SHA"...HEAD | grep -E "(routes/auth|routes/assets|schemas/auth|migrations/|hooks/)" || true)
+          if [ -n "$TOUCHED" ] && ! printf '%s' "$MSG" | grep -qE "T-[0-9]+[A-Z]?"; then
+            echo "::error::Axis 2 FAIL: RBAC/auth/migrations/hooks changed but no [T-XX] xref in PR title/body"
+            exit 1
+          fi
+
+      - name: Axis 3 — Plan mode trace
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: |
+          PLAN_REF=$(git log --format=%B "$BASE_SHA"...HEAD | grep -iE "plan(mode)?|self-check" || true)
+          if [ -z "$PLAN_REF" ]; then
+            echo "::warning::Axis 3 advisory: no plan-mode/self-check trace in commit messages"
+          fi
+
+      - name: Axis 4 — Self-check (precommit-check.sh)
+        run: |
+          test -f hooks/precommit-check.sh || { echo "::error::hooks/precommit-check.sh not found in checkout"; exit 1; }
+          bash hooks/precommit-check.sh > self-check.json 2>&1 || {
+            echo "::error::Axis 4 FAIL: precommit-check.sh non-zero exit"
+            cat self-check.json
+            exit 1
+          }
+          OK=$(jq -r '.overall_ok' self-check.json)
+          if [ "$OK" != "true" ]; then
+            echo "::error::Axis 4 FAIL: overall_ok != true"
+            cat self-check.json
+            exit 1
+          fi
+
+      - name: Axis 5 — Blocklist 9 bypass scan
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || 'HEAD~1' }}
+        run: |
+          DIFF=$(git diff "$BASE_SHA"...HEAD)
+          # Pattern requires GNU grep -E (ubuntu-latest provides GNU grep 3.x).
+          PATTERNS='rm -rf /|dd if=/dev/|mkfs\.|find [^|]+ -delete|shred -|chmod 0[0-7]{3}|DROP[[:space:]]+TABLE|>[[:space:]]*/etc/'
+          if echo "$DIFF" | grep -qE "$PATTERNS"; then
+            echo "::error::Axis 5 FAIL: blocklist pattern in diff"
+            exit 1
+          fi
+
+      - name: Claude verdict (5-axis aggregation)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          # Real review-subagent invocation via Claude API. Stub for D+29 activation.
+          # Replace with: claude -p "review-subagent: ..." or anthropic SDK call.
+          echo '{"verdict":"approve","blockers":[],"majors":[],"minors":[],"note":"D+29 activation pending"}' > review.json
+          cat review.json
+
+      - name: Post comment on PR
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const review = JSON.parse(fs.readFileSync('review.json', 'utf8'));
+            const body = [
+              '## Claude review (T-34, 5-axis)',
+              '',
+              `**Verdict**: ${review.verdict}`,
+              `**Blockers**: ${review.blockers.length}`,
+              `**Majors**: ${review.majors.length}`,
+              `**Minors**: ${review.minors.length}`,
+              '',
+              review.note ? `> ${review.note}` : '',
+            ].join('\n');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body
+            });
+
+      - name: Block on verdict
+        run: |
+          VERDICT=$(jq -r '.verdict' review.json)
+          if [ "$VERDICT" = "block" ]; then
+            echo "::error::review-subagent verdict=block — see PR comment"
+            exit 1
+          fi

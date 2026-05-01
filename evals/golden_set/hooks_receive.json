@@ -1,0 +1,110 @@
+{
+  "$schema": "evals/golden_set/_schema.md",
+  "decision_refs": ["T-13", "T-14", "T-23", "T-28", "T-29"],
+  "description": "T-13 wrapper 5 payload types: Edit/Write tool_call, Skill skill_trigger, MCP tool_call, session_start, session_end.",
+  "cases": [
+    {
+      "id": "hooks-V1-edit-tool",
+      "scenario": "Edit tool PostToolUse → server INSERT usage_events with tool_use_id dedup",
+      "given": {
+        "stdin_json": {
+          "tool_name": "Edit",
+          "tool_use_id": "toolu_01abc",
+          "session_id": "sess_001",
+          "duration_ms": 142,
+          "success": true,
+          "source": "claude-code"
+        },
+        "wrapper_invocation": "send-event.sh tool_call"
+      },
+      "expected": {
+        "curl_target": "${TEAM_HOOKS_URL}/hooks/event",
+        "post_body_keys": ["type","user_id","tool_name","tool_use_id","session_id","source","duration_ms","success","timestamp"],
+        "type": "tool_call",
+        "tool_name": "Edit",
+        "duration_ms": 142,
+        "success": true,
+        "db_after": { "usage_events": 1, "tool_use_id": "toolu_01abc" }
+      },
+      "decision": "T-13, T-23, T-29"
+    },
+    {
+      "id": "hooks-V2-skill-trigger",
+      "scenario": "Skill tool with metadata.skill_name → asset_id 매핑 INSERT",
+      "given": {
+        "stdin_json": {
+          "tool_name": "Skill",
+          "tool_use_id": "toolu_02xyz",
+          "session_id": "sess_002",
+          "tool_input": { "metadata": { "skill_name": "anthropic-skills:pdf" } },
+          "duration_ms": 8,
+          "success": true
+        }
+      },
+      "expected": {
+        "extracted_skill_name": "anthropic-skills:pdf",
+        "server_query": "SELECT id FROM assets WHERE name = ? AND type = 'skill'",
+        "db_after": { "usage_events": 1, "asset_id": "<resolved>", "tool_name": "Skill" }
+      },
+      "decision": "T-14"
+    },
+    {
+      "id": "hooks-V3-mcp-tool",
+      "scenario": "MCP tool (mcp__github__list_issues) PostToolUse → tool_name 추출",
+      "given": {
+        "stdin_json": {
+          "tool_name": "mcp__github__list_issues",
+          "tool_use_id": "toolu_03def",
+          "session_id": "sess_003",
+          "duration_ms": 320,
+          "success": true
+        }
+      },
+      "expected": {
+        "extracted_tool_name": "mcp__github__list_issues",
+        "db_after": { "usage_events": 1, "tool_name": "mcp__github__list_issues" }
+      },
+      "decision": "T-28"
+    },
+    {
+      "id": "hooks-session-start",
+      "scenario": "SessionStart hook → INSERT session row",
+      "given": {
+        "stdin_json": { "session_id": "sess_004" },
+        "wrapper_invocation": "send-event.sh session_start"
+      },
+      "expected": {
+        "type": "session_start",
+        "tool_name": "",
+        "duration_ms": 0,
+        "success": true
+      },
+      "decision": "T-13"
+    },
+    {
+      "id": "hooks-session-end",
+      "scenario": "Stop hook → session_end event",
+      "given": {
+        "stdin_json": { "session_id": "sess_004" },
+        "wrapper_invocation": "send-event.sh session_end"
+      },
+      "expected": {
+        "type": "session_end",
+        "session_id": "sess_004"
+      },
+      "decision": "T-13"
+    },
+    {
+      "id": "hooks-T29-dedup-by-tool-use-id",
+      "scenario": "동일 tool_use_id 두 번 수신 → 두 번째 무시 (T-29 dedup)",
+      "given": {
+        "step1": "POST /hooks/event with tool_use_id=toolu_dup",
+        "step2": "POST /hooks/event with tool_use_id=toolu_dup (replay)"
+      },
+      "expected": {
+        "db_after": { "usage_events_count_for_id": 1 }
+      },
+      "decision": "T-29"
+    }
+  ]
+}
