@@ -62,6 +62,25 @@ beforeAll(() => {
       INSERT INTO assets_fts(rowid, name, description)
       VALUES (new.rowid, new.name, COALESCE(new.description, ''));
     END;
+    CREATE TABLE usage_events (
+      id TEXT PRIMARY KEY NOT NULL,
+      user_id TEXT NOT NULL,
+      session_id TEXT,
+      event_type TEXT NOT NULL CHECK (event_type IN (
+        'session_start','session_end','tool_call','file_edit',
+        'skill_trigger','asset_view','asset_install','review_action'
+      )),
+      asset_id TEXT REFERENCES assets(id),
+      tool_name TEXT,
+      file_path TEXT,
+      ts INTEGER NOT NULL DEFAULT (unixepoch()),
+      metadata TEXT NOT NULL DEFAULT '{}',
+      review_metadata TEXT,
+      CHECK (
+        (event_type = 'review_action' AND review_metadata IS NOT NULL) OR
+        (event_type != 'review_action')
+      )
+    );
   `)
 })
 
@@ -237,5 +256,62 @@ describe('transitionStatus (T-16·T-34)', () => {
     const r = transitionStatus(a.id, 'draft', ADMIN_ID, 'admin', db)
     expect(r.ok).toBe(false)
     if (!r.ok) expect(r.code).toBe('INVALID_TRANSITION')
+  })
+})
+
+// ── D-B review_action events (T-31D + 보강 #1) ─────────────────────────────
+
+describe('D-B review_action usage_events (T-31D)', () => {
+  const getReviewEvents = (assetId: string) =>
+    db.prepare(
+      `SELECT event_type, review_metadata FROM usage_events WHERE asset_id = ? AND event_type = 'review_action' ORDER BY rowid ASC`
+    ).all(assetId) as { event_type: string; review_metadata: string }[]
+
+  it('submitForReview → review_action "submit" INSERT (review_metadata NOT NULL)', () => {
+    const a = mkAsset('review-event-submit', AUTHOR_ID)
+    submitForReview(a.id, AUTHOR_ID, 'member', db)
+
+    const events = getReviewEvents(a.id)
+    expect(events).toHaveLength(1)
+    const meta = JSON.parse(events[0]!.review_metadata) as Record<string, unknown>
+    expect(meta['action']).toBe('submit')
+    expect(meta['actor_id']).toBe(AUTHOR_ID)
+    expect(meta['reason_code']).toBeNull()
+  })
+
+  it('approve → review_action "approve" INSERT', () => {
+    const a = mkAsset('review-event-approve', AUTHOR_ID)
+    submitForReview(a.id, AUTHOR_ID, 'member', db)
+    transitionStatus(a.id, 'approved', REVIEWER_ID, 'reviewer', db)
+
+    const events = getReviewEvents(a.id)
+    // submit + approve = 2 events
+    const approveEvt = events.find((e) => JSON.parse(e.review_metadata)['action'] === 'approve')
+    expect(approveEvt).toBeTruthy()
+    const meta = JSON.parse(approveEvt!.review_metadata) as Record<string, unknown>
+    expect(meta['actor_id']).toBe(REVIEWER_ID)
+  })
+
+  it('reject → review_action "reject" + reason_code 저장', () => {
+    const a = mkAsset('review-event-reject', AUTHOR_ID)
+    submitForReview(a.id, AUTHOR_ID, 'member', db)
+    transitionStatus(a.id, 'draft', REVIEWER_ID, 'reviewer', db, { reasonCode: 'R-07' })
+
+    const events = getReviewEvents(a.id)
+    const rejectEvt = events.find((e) => JSON.parse(e.review_metadata)['action'] === 'reject')
+    expect(rejectEvt).toBeTruthy()
+    const meta = JSON.parse(rejectEvt!.review_metadata) as Record<string, unknown>
+    expect(meta['reason_code']).toBe('R-07')
+  })
+
+  it('deprecate → review_action "deprecate" INSERT', () => {
+    const a = mkAsset('review-event-deprecate', AUTHOR_ID)
+    submitForReview(a.id, AUTHOR_ID, 'member', db)
+    transitionStatus(a.id, 'approved', REVIEWER_ID, 'reviewer', db)
+    transitionStatus(a.id, 'deprecated', ADMIN_ID, 'admin', db)
+
+    const events = getReviewEvents(a.id)
+    const deprEvt = events.find((e) => JSON.parse(e.review_metadata)['action'] === 'deprecate')
+    expect(deprEvt).toBeTruthy()
   })
 })
