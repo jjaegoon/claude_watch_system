@@ -56,6 +56,17 @@
 | T-36 | 페르소나 cadence — 분기 인간 + 월 LLM-as-Judge |
 | T-37 | 게이트 자동 — B-1·B-2·M2 자동; M1·M3·M4 사용자 어드민 |
 | T-38 | settings.json deny 라이프사이클(pre/post/phase-out) 정합. Globbed 패턴 우선 |
+| T-40 | **옵션 B-2 채택** — packages/db `type: "module"` + 조건부 exports field (4 entry) + `.js` 확장자 명시 + `import.meta.url` ESM 패턴 + tsconfig `module: NodeNext` override. apps/api는 자체 connection 우회 제거 후 packages/db client·schema 직접 사용 |
+| T-42 | FTS5 trigram 토크나이저 (migration 010) + buildFts5Query trigram query rewrite 정합 |
+
+## T-31 (Cowork 권고 채택 — M1 게이트 후 확정, 2026-05-02)
+
+| ID | 결정 1줄 |
+|----|----------|
+| T-31A3 | 현 typeFields 명명 유지 + 클라이언트 매핑 테이블 `apps/web/src/lib/asset-field-mapping.ts`로 별도 문서화 (M3 시점 작성; M2는 schema 1줄 cross-ref만) |
+| T-31B2 | POST/PUT 핸들러 try-catch + 5xx 일반 응답 (`{ ok: false, error: { code: 'INTERNAL_ERROR' } }`) — DB transaction은 db-level에서 원자성 보장, 앱 레벨은 catch만 |
+| T-31C  | CreateAssetSchema에 `SlashNameSchema = z.string().regex(/^[a-z][a-z0-9-]{1,30}$/)` 추가. 5케이스 단위 테스트 (valid/leading-dash/uppercase/too-short/too-long) |
+| T-31D  | usage_events + asset trigger 통합 설계 **보류** — M3 Hooks·skill_trigger 시점 또는 Phase O에서 결정 |
 
 ## Non-decisions (자주 헷갈리는 것)
 
