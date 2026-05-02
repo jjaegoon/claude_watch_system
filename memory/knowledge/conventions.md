@@ -85,3 +85,7 @@ CLAUDE.md (Obsidian 프로젝트 디렉터리)의 코드 스타일을 압축.
   - gotcha #6 참조.
 
 - **`packageManager` 필드 필수** — `package.json`의 `packageManager: "pnpm@<exact-version>"` 핀. corepack이 본 필드를 보고 새 셸·새 환경에서 자동 정확 버전 활성. 누락 시 nvm 전환·새 머신 설정 시 버전 표류.
+
+## Hooks (hooks/*.sh)
+
+- **hooks/*.sh 패턴 정의 컨텍스트 라인은 staged_secrets/blocklist false-positive 영역** — blocklist 탐지 패턴 문자열을 hooks/*.sh 본문에 직접 포함 시 precommit-check.sh 자체 commit이 차단됨. split encoding(`fb_a`·`fb_b` 변수 분할) 또는 scanner-allowlist.ts 등재 필수. gotcha #16 참조.

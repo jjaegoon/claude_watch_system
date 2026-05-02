@@ -320,3 +320,36 @@ export const buildFts5Query = (raw: string): string => {
 **영구 차단**: 한글 입력을 처리하는 모든 문자열 함수에서 `normalize('NFC')` 선행 의무. searchService.ts에 적용 완료. 특히 length 비교·substring 연산·FTS5 query 빌드 전에 정규화 필수.
 
 **발견**: M1 Step 4, 2026-05-02 (C-5 자율 체크리스트 항목)
+
+## #16 hooks/*.sh 패턴 정의 컨텍스트 라인 false-positive — 메타 hook 함정 ★★★★★
+
+**증상**: precommit-check.sh(또는 hooks/*.sh 전반)를 staged 후 precommit-check.sh 자체를 실행하면, 스크립트 본문에 정의된 blocklist 패턴(포크 밤·DROP TABLE·`rm -rf` 등)을 scanner가 "위험 패턴 포함 파일"로 오탐. precommit-check.sh commit 자체가 blocklist FAIL로 차단됨.
+
+**원인 (구조적 메타 함정)**: hook 스크립트는 위험 패턴을 탐지하기 위해 그 패턴 문자열을 코드 본문에 직접 정의한다. 이 "컨텍스트 라인"들이 스크립트 자신을 위험 파일로 오인하게 만듦. 탐지 도구가 탐지 규칙을 본문에 포함해야 하는 self-referential bootstrapping 구조의 본질적 함정.
+
+**stack trace 인용**:
+```
+precommit-check: [blocklist] FAIL — staged file contains dangerous pattern: :\(\)\{
+```
+precommit-check.sh 안의 fork bomb 탐지 regex 문자열이 scan 자신에게 매칭.
+
+**처방**:
+1. **split encoding** — 위험 패턴 문자열을 변수로 분할하여 단순 문자열 매칭 우회:
+   ```bash
+   # fork bomb 분할 인코딩 (gotcha #3과 동일 처방)
+   fb_a=':\('; fb_b='\)\{[[:space:]]*:'; pattern="${fb_a}${fb_b}"
+   ```
+2. **scanner-allowlist.ts 등재** — hooks/*.sh 경로 자체를 allowlist에 추가:
+   ```ts
+   // scanner-allowlist.ts
+   { paths: ['hooks/*.sh', '.claude/**/*.sh'] }
+   ```
+3. **패턴 문자열 간접 참조** — blocklist 패턴을 외부 파일(예: `blocklist-patterns.txt`)에서 읽어 스크립트 본문에서 제거.
+
+**영구 차단**:
+- 새 blocklist 패턴을 hooks/*.sh에 직접 추가 시 split encoding 또는 allowlist 의무 (conventions.md "hooks/*.sh 패턴 정의 컨텍스트 라인 false-positive 영역" 참조)
+- precommit-check.sh 변경 commit 전 스크립트 자체를 staged 후 precommit-check.sh 재실행으로 자기 검증 의무
+
+**메타 인사이트**: M1 Step 4 자율 발견. 본 시스템이 자기 개선 메커니즘(precommit-check.sh) 자체의 취약점을 발견 — "보안 도구를 만드는 도구가 보안 도구의 룰을 어긴다"는 bootstrapping 문제. gotcha #3(precommit-check.sh 함정)의 메타 레벨 일반화.
+
+**발견**: M1 Step 4, 2026-05-02 (자율 발견 보너스 — C-5 체크리스트 외)
