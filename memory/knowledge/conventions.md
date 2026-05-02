@@ -82,6 +82,7 @@ CLAUDE.md (Obsidian 프로젝트 디렉터리)의 코드 스타일을 압축.
   2. `corepack enable` — pnpm/yarn 자동 활성. `package.json`의 `packageManager` 필드를 보고 정확 버전 채택
   3. `pnpm install --force` — Node ABI 변경 시 native 모듈 재컴파일 강제 (better-sqlite3 등)
   - 단계 누락 시 `pnpm: command not found`(글로벌 손실) 또는 native 바인딩 ABI 불일치.
+  - **Node 버전 전환·새 셸 세션 재진입 후 native 의존성(better-sqlite3 등) 사용 전 `pnpm install` 재실행 필수** — ABI 불일치(ERR_DLOPEN_FAILED) 방지. gotcha #17 참조.
   - gotcha #6 참조.
 
 - **`packageManager` 필드 필수** — `package.json`의 `packageManager: "pnpm@<exact-version>"` 핀. corepack이 본 필드를 보고 새 셸·새 환경에서 자동 정확 버전 활성. 누락 시 nvm 전환·새 머신 설정 시 버전 표류.

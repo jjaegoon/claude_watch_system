@@ -353,3 +353,28 @@ precommit-check.sh 안의 fork bomb 탐지 regex 문자열이 scan 자신에게 
 **메타 인사이트**: M1 Step 4 자율 발견. 본 시스템이 자기 개선 메커니즘(precommit-check.sh) 자체의 취약점을 발견 — "보안 도구를 만드는 도구가 보안 도구의 룰을 어긴다"는 bootstrapping 문제. gotcha #3(precommit-check.sh 함정)의 메타 레벨 일반화.
 
 **발견**: M1 Step 4, 2026-05-02 (자율 발견 보너스 — C-5 체크리스트 외)
+
+## #17 Node 버전 전환 후 native binding ABI 불일치 — ERR_DLOPEN_FAILED
+
+**증상**: `pnpm --filter @team-claude/api seed` 실행 시 `ERR_DLOPEN_FAILED` 크래시.
+```
+Error: /...better_sqlite3.node: invalid ELF header
+NODE_MODULE_VERSION mismatch: 137 (compiled) vs 127 (current Node)
+```
+better-sqlite3 등 native addon이 다른 Node 버전(v24=ABI 137)으로 컴파일된 채 현재 셸(v22=ABI 127)에서 로드 시도.
+
+**원인**: nvm으로 Node 버전 전환 또는 새 셸 세션 재진입 시 `node_modules/` 내 `.node` 바이너리는 이전 버전 ABI로 컴파일된 상태. pnpm install 없이 실행하면 ABI 불일치로 dlopen 실패.
+
+**처방**:
+```bash
+rm -rf node_modules && pnpm install   # 전체 재설치 + native 재컴파일 (~1분)
+# 또는 selective rebuild
+pnpm rebuild better-sqlite3
+```
+
+**영구 차단**:
+- Node 버전 전환 또는 새 셸 세션 재진입 후 native 의존성(better-sqlite3·bcrypt·esbuild 등) 사용 전 `pnpm install` 필수 (conventions.md "Node 버전 전환·세션 재진입 시 pnpm install 재실행 의무" 참조)
+- gotcha #6(nvm 전환 시 글로벌 패키지 손실) + gotcha #7(pnpm Ignored build scripts) 의 ABI 변종
+- precommit-check.sh check 항목 추가 후보 (T-39): `node --version` + `.node` 바이너리 ABI 일치 검증
+
+**발견**: M1 Step 7 8단계 직전, 2026-05-02 (사용자 셸 검증 시점). 누적 gotcha 17건.
