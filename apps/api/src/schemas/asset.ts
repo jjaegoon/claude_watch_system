@@ -52,7 +52,21 @@ export const updateAssetSchema = z.object({
   typeFields:  z.record(z.unknown()).optional(),
 })
 
-export type AssetListQuery   = z.infer<typeof assetListQuerySchema>
-export type AssetIdParam     = z.infer<typeof assetIdParamSchema>
-export type CreateAssetInput = z.infer<typeof createAssetSchema>
-export type UpdateAssetInput = z.infer<typeof updateAssetSchema>
+/** T-16 반려 사유 코드 — 자산_품질_기준.md §4 12종 */
+export const RejectReasonSchema = z.enum([
+  'R-01', 'R-02', 'R-03', 'R-04', 'R-05', 'R-06',
+  'R-07', 'R-08', 'R-09', 'R-10', 'R-11', 'R-12',
+])
+
+/** T-16 PATCH /assets/:id/status 상태 전이 입력 스키마 */
+export const statusTransitionSchema = z.object({
+  status:      z.enum(['draft', 'in_review', 'approved', 'deprecated']),
+  reason_code: RejectReasonSchema.optional(),
+  change_note: z.string().max(500).optional(),
+})
+
+export type AssetListQuery        = z.infer<typeof assetListQuerySchema>
+export type AssetIdParam          = z.infer<typeof assetIdParamSchema>
+export type CreateAssetInput      = z.infer<typeof createAssetSchema>
+export type UpdateAssetInput      = z.infer<typeof updateAssetSchema>
+export type StatusTransitionInput = z.infer<typeof statusTransitionSchema>

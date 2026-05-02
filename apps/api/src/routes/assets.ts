@@ -1,10 +1,11 @@
 import { Hono } from 'hono'
 import { sqlite } from '@team-claude/db/client'
 import { requireAuth } from '../middleware/auth.js'
-import { assetListQuerySchema, assetIdParamSchema, createAssetSchema, updateAssetSchema } from '../schemas/asset.js'
+import { assetListQuerySchema, assetIdParamSchema, createAssetSchema, updateAssetSchema, statusTransitionSchema } from '../schemas/asset.js'
 import { listAssets, getAssetById } from '../services/assetQueryService.js'
 import { buildFts5Query } from '../services/searchService.js'
 import { createAsset, updateAsset } from '../services/assetWriteService.js'
+import { transitionStatus, submitForReview } from '../services/assetStatusService.js'
 
 export const assetsRoute = new Hono()
 
@@ -110,6 +111,86 @@ assetsRoute.put('/:id', async (c) => {
   } catch {
     return c.json(
       { ok: false, error: { code: 'INTERNAL_ERROR', message: '자산 수정 중 오류가 발생했습니다' } },
+      500,
+    )
+  }
+})
+
+// POST /assets/:id/submit-for-review (T-16: draft→in_review, author OR reviewer+)
+assetsRoute.post('/:id/submit-for-review', async (c) => {
+  const user = c.get('user')
+
+  const paramParsed = assetIdParamSchema.safeParse({ id: c.req.param('id') })
+  if (!paramParsed.success) {
+    return c.json(
+      { ok: false, error: { code: 'INVALID_INPUT', message: '유효하지 않은 asset ID' } },
+      400,
+    )
+  }
+
+  try {
+    const result = submitForReview(paramParsed.data.id, user.sub, user.role, sqlite)
+    if (!result.ok) {
+      const status = result.code === 'NOT_FOUND' ? 404 : result.code === 'INVALID_TRANSITION' ? 409 : 403
+      return c.json({ ok: false, error: { code: result.code, message: result.message } }, status)
+    }
+    return c.json({ ok: true, data: result.asset })
+  } catch {
+    return c.json(
+      { ok: false, error: { code: 'INTERNAL_ERROR', message: '상태 전이 중 오류가 발생했습니다' } },
+      500,
+    )
+  }
+})
+
+// PATCH /assets/:id/status (T-16 전이 매트릭스 + T-34 system_user 예외)
+assetsRoute.patch('/:id/status', async (c) => {
+  const user = c.get('user')
+
+  const paramParsed = assetIdParamSchema.safeParse({ id: c.req.param('id') })
+  if (!paramParsed.success) {
+    return c.json(
+      { ok: false, error: { code: 'INVALID_INPUT', message: '유효하지 않은 asset ID' } },
+      400,
+    )
+  }
+
+  let body: unknown
+  try { body = await c.req.json() } catch {
+    return c.json(
+      { ok: false, error: { code: 'INVALID_INPUT', message: '요청 본문이 JSON 형식이 아닙니다' } },
+      400,
+    )
+  }
+
+  const bodyParsed = statusTransitionSchema.safeParse(body)
+  if (!bodyParsed.success) {
+    return c.json(
+      { ok: false, error: { code: 'INVALID_INPUT', message: bodyParsed.error.message } },
+      400,
+    )
+  }
+
+  try {
+    const result = transitionStatus(
+      paramParsed.data.id,
+      bodyParsed.data.status,
+      user.sub,
+      user.role,
+      sqlite,
+      { reasonCode: bodyParsed.data.reason_code, changeNote: bodyParsed.data.change_note },
+    )
+    if (!result.ok) {
+      const status = result.code === 'NOT_FOUND' ? 404
+        : result.code === 'INVALID_TRANSITION' ? 409
+        : result.code === 'REASON_REQUIRED' ? 422
+        : 403
+      return c.json({ ok: false, error: { code: result.code, message: result.message } }, status)
+    }
+    return c.json({ ok: true, data: result.asset })
+  } catch {
+    return c.json(
+      { ok: false, error: { code: 'INTERNAL_ERROR', message: '상태 전이 중 오류가 발생했습니다' } },
       500,
     )
   }
