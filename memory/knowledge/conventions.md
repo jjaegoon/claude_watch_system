@@ -7,6 +7,7 @@ CLAUDE.md (Obsidian 프로젝트 디렉터리)의 코드 스타일을 압축.
 - **strict 모드 필수** (tsconfig: strict, noUncheckedIndexedAccess, noImplicitAny)
 - `any` 금지. `unknown` + 명시적 narrowing 사용
 - `console.log` 금지 (개발 중 임시 OK, commit 전 제거). Logger는 `pino` 또는 직접 정의 wrapper
+- **`jwt.sign` 호출 시 `jwtid: crypto.randomUUID()` 옵션 의무** (gotcha #10 + T-41 정합). 누락 시 동일 payload+iat → 동일 token 충돌 위험. M3+ 신규 JWT path 추가 시 ESLint `no-jwt-sign-without-jti` 룰 도입 검토.
 - export 함수·타입은 JSDoc 주석 (1-2줄, why-only)
 - 라우트 핸들러는 `apps/api/src/routes/*.ts`에만, middleware는 `apps/api/src/middleware/*.ts`
 - 스키마는 `packages/db/src/schema.ts` 단일 출처
