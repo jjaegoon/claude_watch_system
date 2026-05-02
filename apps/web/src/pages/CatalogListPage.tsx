@@ -56,12 +56,20 @@ export function CatalogListPage() {
     <div style={{ minHeight: '100vh', background: '#f8fafc' }}>
       <div style={{ background: '#fff', borderBottom: '1px solid #e2e8f0', padding: '16px 24px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#1e293b' }}>Team Claude Catalog</h1>
-        <button
-          onClick={handleLogout}
-          style={{ padding: '6px 14px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 14, color: '#475569' }}
-        >
-          로그아웃
-        </button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => navigate('/catalog/new')}
+            style={{ padding: '6px 14px', background: '#0d6efd', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, color: '#fff' }}
+          >
+            + 새 자산
+          </button>
+          <button
+            onClick={handleLogout}
+            style={{ padding: '6px 14px', background: '#f1f5f9', border: '1px solid #e2e8f0', borderRadius: 6, cursor: 'pointer', fontSize: 14, color: '#475569' }}
+          >
+            로그아웃
+          </button>
+        </div>
       </div>
 
       <div style={{ maxWidth: 900, margin: '0 auto', padding: '24px 16px' }}>
