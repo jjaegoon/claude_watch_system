@@ -58,6 +58,12 @@ export function CatalogListPage() {
         <h1 style={{ margin: 0, fontSize: 20, fontWeight: 700, color: '#1e293b' }}>Team Claude Catalog</h1>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
+            onClick={() => navigate('/dashboard')}
+            style={{ padding: '6px 14px', background: '#8b5cf6', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, color: '#fff' }}
+          >
+            대시보드
+          </button>
+          <button
             onClick={() => navigate('/catalog/new')}
             style={{ padding: '6px 14px', background: '#0d6efd', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 14, color: '#fff' }}
           >
