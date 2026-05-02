@@ -78,6 +78,9 @@ function DownloadSection({ assetId }: { assetId: string }) {
 
       {data.type === 'skill' && (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+            설치 후 Claude Code에서 <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>/{data.name}</code> 형태로 즉시 호출 가능합니다.
+          </p>
           {data.install_command && (
             <div>
               <p style={{ margin: '0 0 6px', fontSize: 12, color: '#64748b' }}>
@@ -94,6 +97,9 @@ function DownloadSection({ assetId }: { assetId: string }) {
 
       {data.type === 'prompt' && (
         <div>
+          <p style={{ margin: '0 0 8px', fontSize: 12, color: '#64748b' }}>
+            복사 후 Claude 대화 창에 붙여넣어 바로 사용하세요.
+          </p>
           {data.body_text && (
             <>
               <pre style={{
@@ -112,6 +118,9 @@ function DownloadSection({ assetId }: { assetId: string }) {
       {data.type === 'command' && (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
           <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+            파일을 <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>~/.claude/commands/</code> 에 저장하면 <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>/{data.name}</code> 형태로 호출 가능합니다.
+          </p>
+          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
             설치 위치: <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>{data.install_target}</code>
           </p>
           {data.body_text && (
@@ -129,6 +138,9 @@ function DownloadSection({ assetId }: { assetId: string }) {
 
       {data.type === 'mcp' && (
         <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+            <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>claude_desktop_config.json</code> 또는 <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>.claude/settings.json</code> 의 <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>mcpServers</code> 블록에 아래 설정을 추가하세요.
+          </p>
           {data.repo_url && (
             <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
               저장소: <a href={data.repo_url} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>{data.repo_url}</a>

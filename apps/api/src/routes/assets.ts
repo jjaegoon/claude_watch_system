@@ -268,13 +268,17 @@ assetsRoute.get('/:id/download', async (c) => {
     }
   }
 
-  // asset_install 이벤트 기록 (fire-and-forget, gotcha #18 정합 — ORDER BY ts, rowid)
-  try {
-    sqlite.prepare(
-      `INSERT INTO usage_events (id, user_id, event_type, asset_id, ts, metadata)
-       VALUES (?, ?, 'asset_install', ?, unixepoch(), '{"source":"catalog_ui"}')`
-    ).run(crypto.randomUUID(), user.sub, parsed.data.id)
-  } catch { /* fire-and-forget */ }
+  // asset_download 이벤트 기록 (L2 — 설치 의도, fire-and-forget, bot UA 차단)
+  const dlUa = c.req.header('user-agent') ?? ''
+  const dlIsBot = /bot|crawler|spider/i.test(dlUa)
+  if (!dlIsBot) {
+    try {
+      sqlite.prepare(
+        `INSERT INTO usage_events (id, user_id, event_type, asset_id, ts, metadata)
+         VALUES (?, ?, 'asset_download', ?, unixepoch(), '{"source":"download_endpoint"}')`
+      ).run(crypto.randomUUID(), user.sub, asset.id)
+    } catch { /* fire-and-forget */ }
+  }
 
   return c.json({ ok: true, data: downloadInfo })
 })

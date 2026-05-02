@@ -1,7 +1,7 @@
 /**
  * M5 영역 #2 — GET /assets/:id/download e2e 테스트
  * - 자산 type별 다운로드 정보 정합 (skill·prompt·command·mcp)
- * - asset_install event INSERT 정합
+ * - asset_download event INSERT 정합
  * - 권한 검증 (미인증 401, 미존재 404, invalid UUID 400)
  */
 import { describe, it, expect, beforeAll } from 'vitest'
@@ -83,6 +83,28 @@ describe('GET /assets/:id/download — 인증·입력 검증', () => {
     const json = await res.json() as { ok: boolean; error: { code: string } }
     expect(json.error.code).toBe('NOT_FOUND')
   })
+
+  it('bot User-Agent → asset_download INSERT 없음', async () => {
+    const id = assetIdByType['skill'] ?? '00000000-0000-0000-0000-000000000001'
+    const before = (sqlite.prepare(
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
+    ).get(id) as { cnt: number }).cnt
+
+    await app.request(`/assets/${id}/download`, {
+      headers: {
+        Authorization: `Bearer ${aliceToken}`,
+        Origin: ORIGIN,
+        'X-Forwarded-For': IP,
+        'user-agent': 'Googlebot/2.1 (+http://www.google.com/bot.html)',
+      },
+    })
+
+    const after = (sqlite.prepare(
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
+    ).get(id) as { cnt: number }).cnt
+
+    expect(after).toBe(before)
+  })
 })
 
 // ── Skill 다운로드 ──────────────────────────────────────────────────────────
@@ -99,17 +121,17 @@ describe('GET /assets/:id/download — skill', () => {
     expect(typeof json.data.install_target).toBe('string')
   })
 
-  it('skill download → asset_install 1건 INSERT', async () => {
+  it('skill download → asset_download 1건 INSERT', async () => {
     const id = assetIdByType['skill']
     if (!id) return
     const before = (sqlite.prepare(
-      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_install' AND asset_id=?`
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
     ).get(id) as { cnt: number }).cnt
 
     await download(adminToken, id)
 
     const after = (sqlite.prepare(
-      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_install' AND asset_id=?`
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
     ).get(id) as { cnt: number }).cnt
     expect(after).toBe(before + 1)
   })
@@ -129,17 +151,17 @@ describe('GET /assets/:id/download — prompt', () => {
     expect(typeof json.data.body_text).toBe('string')
   })
 
-  it('prompt download → asset_install 1건 INSERT', async () => {
+  it('prompt download → asset_download 1건 INSERT', async () => {
     const id = assetIdByType['prompt']
     if (!id) return
     const before = (sqlite.prepare(
-      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_install' AND asset_id=?`
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
     ).get(id) as { cnt: number }).cnt
 
     await download(aliceToken, id)
 
     const after = (sqlite.prepare(
-      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_install' AND asset_id=?`
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
     ).get(id) as { cnt: number }).cnt
     expect(after).toBe(before + 1)
   })
@@ -174,17 +196,17 @@ describe('GET /assets/:id/download — mcp', () => {
     expect(typeof json.data.mcp_config).toBe('string')
   })
 
-  it('mcp download → asset_install 1건 INSERT', async () => {
+  it('mcp download → asset_download 1건 INSERT', async () => {
     const id = assetIdByType['mcp']
     if (!id) return
     const before = (sqlite.prepare(
-      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_install' AND asset_id=?`
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
     ).get(id) as { cnt: number }).cnt
 
     await download(adminToken, id)
 
     const after = (sqlite.prepare(
-      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_install' AND asset_id=?`
+      `SELECT COUNT(*) as cnt FROM usage_events WHERE event_type='asset_download' AND asset_id=?`
     ).get(id) as { cnt: number }).cnt
     expect(after).toBe(before + 1)
   })
