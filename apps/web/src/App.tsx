@@ -5,6 +5,7 @@ import { LoginPage } from './pages/LoginPage.js'
 import { CatalogListPage } from './pages/CatalogListPage.js'
 import { AssetDetailPage } from './pages/AssetDetailPage.js'
 import { AssetCreatePage } from './pages/AssetCreatePage.js'
+import { DashboardPage } from './pages/DashboardPage.js'
 import { useRef } from 'react'
 
 function AppRoutes() {
@@ -30,6 +31,7 @@ function AppRoutes() {
       <Route path="/catalog" element={<PrivateRoute><CatalogListPage /></PrivateRoute>} />
       <Route path="/catalog/new" element={<PrivateRoute><AssetCreatePage /></PrivateRoute>} />
       <Route path="/catalog/:id" element={<PrivateRoute><AssetDetailPage /></PrivateRoute>} />
+      <Route path="/dashboard" element={<PrivateRoute><DashboardPage /></PrivateRoute>} />
       <Route path="/" element={<Navigate to="/catalog" replace />} />
       <Route path="*" element={<Navigate to="/catalog" replace />} />
     </Routes>

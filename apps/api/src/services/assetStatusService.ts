@@ -1,10 +1,12 @@
 /**
  * T-16 상태 전이 서비스.
  * 전이 허용 매트릭스, RBAC(T-34 system_user 예외 포함), asset_versions 스냅샷(T-20).
+ * D-B (T-31D): 전이 시 usage_events review_action INSERT (audit log 단일 source of truth).
  */
 import Database from 'better-sqlite3'
 import type { UserRole } from '../lib/db.js'
 import type { AssetRow } from './assetQueryService.js'
+import type { ReviewEventMetadata } from '@team-claude/db/schema'
 
 const now = (): number => Math.floor(Date.now() / 1000)
 
@@ -13,6 +15,15 @@ type StatusCode = 'NOT_FOUND' | 'FORBIDDEN' | 'INVALID_TRANSITION' | 'REASON_REQ
 export type StatusTransitionResult =
   | { ok: true; asset: AssetRow }
   | { ok: false; code: StatusCode; message: string }
+
+/** D-B: 전이 → review_action 액션명 매핑 */
+const REVIEW_ACTION_MAP: Readonly<Record<string, ReviewEventMetadata['action'] | undefined>> = {
+  'draft→in_review':   'submit',
+  'in_review→approved': 'approve',
+  'in_review→draft':   'reject',
+  'approved→deprecated': 'deprecate',
+  'deprecated→approved': 'restore',
+}
 
 /** T-16 허용 전이 매트릭스 */
 const TRANSITIONS: Readonly<Record<string, readonly string[]>> = {
@@ -113,12 +124,32 @@ export const transitionStatus = (
     VALUES (?, ?, ?, ?, ?, ?, ?)
   `)
 
+  // D-B: review_action 이벤트 준비 (보강 #1: review_metadata NOT NULL 의무)
+  const reviewAction = REVIEW_ACTION_MAP[`${existing.status}→${newStatus}`]
+  if (!reviewAction) {
+    throw new Error(`review_action 매핑 누락: ${existing.status}→${newStatus}`)
+  }
+  const reviewMetadata: ReviewEventMetadata = {
+    actor_id:    userId,
+    action:      reviewAction,
+    reason_code: opts?.reasonCode ?? null,
+    comment:     opts?.changeNote ?? null,
+  }
+
   db.transaction(() => {
     db.prepare(`UPDATE assets SET status = ?, updated_at = ? WHERE id = ?`).run(newStatus, ts, assetId)
     const updated = { ...existing, status: newStatus, updatedAt: ts }
     insertVersion.run(
       crypto.randomUUID(), assetId, existing.version,
       JSON.stringify(updated), userId, changeNote, ts,
+    )
+    // D-B: usage_events review_action INSERT (보강 #1: review_metadata NOT NULL)
+    db.prepare(`
+      INSERT INTO usage_events (id, user_id, event_type, asset_id, ts, metadata, review_metadata)
+      VALUES (?, ?, 'review_action', ?, ?, '{}', ?)
+    `).run(
+      crypto.randomUUID(), userId, assetId, ts,
+      JSON.stringify(reviewMetadata),
     )
   })()
 

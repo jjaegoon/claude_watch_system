@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { app } from './app.js'
 import { startWorker } from './workers/webhookWorker.js'
+import { startStatsCron } from './workers/statsWorker.js'
 
 // Load .env file (dev convenience — no new dependencies)
 try {
@@ -29,8 +30,11 @@ const server = serve({ fetch: app.fetch, port }, (info) => {
 
 // T-15: webhook_jobs 폴링 워커 시작
 const workerTimer = startWorker()
+// T-26: daily_stats Cron 시작 (1시간마다 UTC 00시 감지)
+const statsTimer = startStatsCron()
 
 process.on('SIGTERM', () => {
   clearInterval(workerTimer)
+  clearInterval(statsTimer)
   server.close()
 })

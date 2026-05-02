@@ -83,30 +83,41 @@ export type UsageEventMetadata = {
   [key: string]: unknown
 }
 
-// ── usage_events (T-23·T-29) ───────────────────────────────────────────────
+// ── ReviewEventMetadata (D-B 보강 #1: review_action 전용) ─────────────────
+export type ReviewEventMetadata = {
+  actor_id:    string
+  action:      'submit' | 'approve' | 'reject' | 'deprecate' | 'restore'
+  reason_code: string | null
+  comment:     string | null
+}
+
+// ── usage_events (T-23·T-29, D-B T-31D) ───────────────────────────────────
 export const usageEvents = sqliteTable('usage_events', {
-  id:        text('id').primaryKey().$defaultFn(uuid),
-  userId:    text('user_id').notNull(),
-  sessionId: text('session_id'),
-  eventType: text('event_type', {
-               enum: [
-                 'session_start',
-                 'session_end',
-                 'tool_call',
-                 'file_edit',
-                 'skill_trigger',
-                 'asset_view',
-                 'asset_install',
-               ],
-             }).notNull(),
-  assetId:   text('asset_id').references(() => assets.id),
-  toolName:  text('tool_name'),
-  filePath:  text('file_path'),
-  ts:        integer('ts', { mode: 'timestamp' }).notNull().default(now),
-  metadata:  text('metadata', { mode: 'json' })
-               .$type<UsageEventMetadata>()
-               .notNull()
-               .default(sql`'{}'`),
+  id:             text('id').primaryKey().$defaultFn(uuid),
+  userId:         text('user_id').notNull(),
+  sessionId:      text('session_id'),
+  eventType:      text('event_type', {
+                    enum: [
+                      'session_start',
+                      'session_end',
+                      'tool_call',
+                      'file_edit',
+                      'skill_trigger',
+                      'asset_view',
+                      'asset_install',
+                      'review_action',
+                    ],
+                  }).notNull(),
+  assetId:        text('asset_id').references(() => assets.id),
+  toolName:       text('tool_name'),
+  filePath:       text('file_path'),
+  ts:             integer('ts', { mode: 'timestamp' }).notNull().default(now),
+  metadata:       text('metadata', { mode: 'json' })
+                    .$type<UsageEventMetadata>()
+                    .notNull()
+                    .default(sql`'{}'`),
+  reviewMetadata: text('review_metadata', { mode: 'json' })
+                    .$type<ReviewEventMetadata>(),
 }, (t) => ({
   tsIdx:          index('idx_events_ts').on(t.ts),
   assetTypeTsIdx: index('idx_events_asset_type_ts').on(t.assetId, t.eventType, t.ts),
