@@ -71,13 +71,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         })
         if (!res.ok) throw new Error('refresh failed')
         const body = (await res.json()) as {
-          data: { accessToken: string; userId: string; role: string }
+          access_token: string
+          user: { id: string; role: string }
         }
         dispatch({
           type: 'BOOT_SUCCESS',
-          accessToken: body.data.accessToken,
-          userId: body.data.userId,
-          role: body.data.role,
+          accessToken: body.access_token,
+          userId: body.user.id,
+          role: body.user.role,
         })
       } catch {
         dispatch({ type: 'BOOT_FAIL' })
@@ -98,13 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(err.error.message)
     }
     const body = (await res.json()) as {
-      data: { accessToken: string; userId: string; role: string }
+      access_token: string
+      user: { id: string; role: string }
     }
     dispatch({
       type: 'LOGIN',
-      accessToken: body.data.accessToken,
-      userId: body.data.userId,
-      role: body.data.role,
+      accessToken: body.access_token,
+      userId: body.user.id,
+      role: body.user.role,
     })
   }, [])
 
@@ -126,9 +128,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         dispatch({ type: 'LOGOUT' })
         return null
       }
-      const body = (await res.json()) as { data: { accessToken: string } }
-      dispatch({ type: 'TOKEN_REFRESH', accessToken: body.data.accessToken })
-      return body.data.accessToken
+      const body = (await res.json()) as { access_token: string }
+      dispatch({ type: 'TOKEN_REFRESH', accessToken: body.access_token })
+      return body.access_token
     } catch {
       dispatch({ type: 'LOGOUT' })
       return null
