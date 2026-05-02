@@ -196,6 +196,89 @@ assetsRoute.patch('/:id/status', async (c) => {
   }
 })
 
+// GET /assets/:id/download — 자산 type별 다운로드 정보 (M5 영역 #2)
+assetsRoute.get('/:id/download', async (c) => {
+  const user = c.get('user')
+
+  const parsed = assetIdParamSchema.safeParse({ id: c.req.param('id') })
+  if (!parsed.success) {
+    return c.json(
+      { ok: false, error: { code: 'INVALID_INPUT', message: '유효하지 않은 asset ID' } },
+      400,
+    )
+  }
+
+  const asset = await getAssetById(parsed.data.id, user.sub, user.role, sqlite)
+
+  if (!asset) {
+    return c.json(
+      { ok: false, error: { code: 'NOT_FOUND', message: 'Asset을 찾을 수 없습니다' } },
+      404,
+    )
+  }
+
+  let typeFields: Record<string, unknown> = {}
+  try {
+    typeFields = (typeof asset.typeFields === 'string'
+      ? JSON.parse(asset.typeFields)
+      : (asset.typeFields ?? {})) as Record<string, unknown>
+  } catch { /* empty typeFields */ }
+
+  let downloadInfo: Record<string, unknown>
+  const assetName = asset.name as string
+  const assetType = asset.type as string
+
+  if (assetType === 'skill') {
+    const repoPath = typeFields.repo_path as string | undefined
+    const installTarget = (typeFields.install_target as string | undefined)
+      ?? `~/.claude/skills/${assetName}/`
+    downloadInfo = {
+      type: 'skill',
+      name: assetName,
+      repo_path: repoPath ?? null,
+      install_target: installTarget,
+      install_command: repoPath
+        ? `git clone <ASSETS_REPO_URL>/${repoPath} "${installTarget}"`
+        : null,
+    }
+  } else if (assetType === 'prompt') {
+    downloadInfo = {
+      type: 'prompt',
+      name: assetName,
+      body_text: (typeFields.body_text as string | undefined) ?? (asset.description as string | null) ?? '',
+    }
+  } else if (assetType === 'command') {
+    const repoPath = typeFields.repo_path as string | undefined
+    const installTarget = (typeFields.install_target as string | undefined)
+      ?? `~/.claude/commands/${assetName}.md`
+    downloadInfo = {
+      type: 'command',
+      name: assetName,
+      repo_path: repoPath ?? null,
+      install_target: installTarget,
+      body_text: (typeFields.body_text as string | undefined) ?? (asset.description as string | null) ?? '',
+    }
+  } else {
+    // mcp
+    downloadInfo = {
+      type: 'mcp',
+      name: assetName,
+      repo_url: (typeFields.repo_url as string | undefined) ?? null,
+      mcp_config: (typeFields.mcp_config as string | undefined) ?? null,
+    }
+  }
+
+  // asset_install 이벤트 기록 (fire-and-forget, gotcha #18 정합 — ORDER BY ts, rowid)
+  try {
+    sqlite.prepare(
+      `INSERT INTO usage_events (id, user_id, event_type, asset_id, ts, metadata)
+       VALUES (?, ?, 'asset_install', ?, unixepoch(), '{"source":"catalog_ui"}')`
+    ).run(crypto.randomUUID(), user.sub, parsed.data.id)
+  } catch { /* fire-and-forget */ }
+
+  return c.json({ ok: true, data: downloadInfo })
+})
+
 // GET /assets/:id
 assetsRoute.get('/:id', async (c) => {
   const user = c.get('user')
@@ -215,6 +298,17 @@ assetsRoute.get('/:id', async (c) => {
       { ok: false, error: { code: 'NOT_FOUND', message: 'Asset을 찾을 수 없습니다' } },
       404,
     )
+  }
+
+  // asset_view 이벤트 기록 — bot 차단, fire-and-forget (M5 영역 #1)
+  const ua = c.req.header('user-agent') ?? ''
+  if (!/bot|crawler|spider/i.test(ua)) {
+    try {
+      sqlite.prepare(
+        `INSERT INTO usage_events (id, user_id, event_type, asset_id, ts, metadata)
+         VALUES (?, ?, 'asset_view', ?, unixepoch(), '{"source":"catalog_ui"}')`
+      ).run(crypto.randomUUID(), user.sub, parsed.data.id)
+    } catch { /* fire-and-forget */ }
   }
 
   return c.json({ ok: true, data: asset })

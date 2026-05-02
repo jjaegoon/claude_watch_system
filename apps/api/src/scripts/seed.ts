@@ -25,6 +25,7 @@ type SeedAsset = {
   authorEmail: string
   tags: string[]
   description: string
+  typeFields?: Record<string, unknown>
 }
 
 const passwordHashes = async () => {
@@ -78,13 +79,55 @@ const seedAssets = (emailToId: Map<string, string>): void => {
   const bobId = emailToId.get('bob@team.local')!
 
   const assets: SeedAsset[] = [
-    { type: 'skill',   name: 'Code Review',         version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['review', 'quality'],     description: '코드 리뷰 자동화 skill' },
-    { type: 'skill',   name: 'API Test Generator',  version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['testing', 'api'],        description: 'API 단위 테스트 자동 생성' },
-    { type: 'prompt',  name: 'Korean Translation',  version: '1.0.0', status: 'approved', authorEmail: 'alice@team.local', tags: ['translation', 'korean'], description: '한국어 번역 prompt' },
-    { type: 'command', name: 'Build Status Check',  version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['ci', 'status'],          description: 'CI 빌드 상태 확인 command' },
-    { type: 'skill',   name: '코드리뷰 도우미',       version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['review', 'korean'],      description: '한국어 코드리뷰 자동화 스킬' },
-    { type: 'skill',   name: 'Alice WIP Skill',     version: '0.1.0', status: 'draft',    authorEmail: 'alice@team.local', tags: ['wip'],                   description: 'alice WIP draft' },
-    { type: 'skill',   name: 'Bob WIP Skill',       version: '0.1.0', status: 'draft',    authorEmail: 'bob@team.local',   tags: ['wip'],                   description: 'bob WIP draft' },
+    {
+      type: 'skill', name: 'Code Review', version: '1.0.0', status: 'approved',
+      authorEmail: 'admin@team.local', tags: ['review', 'quality'], description: '코드 리뷰 자동화 skill',
+      typeFields: { repo_path: 'skills/code-review', install_target: '~/.claude/skills/code-review/' },
+    },
+    {
+      type: 'skill', name: 'API Test Generator', version: '1.0.0', status: 'approved',
+      authorEmail: 'admin@team.local', tags: ['testing', 'api'], description: 'API 단위 테스트 자동 생성',
+      typeFields: { repo_path: 'skills/api-test-generator', install_target: '~/.claude/skills/api-test-generator/' },
+    },
+    {
+      type: 'prompt', name: 'Korean Translation', version: '1.0.0', status: 'approved',
+      authorEmail: 'alice@team.local', tags: ['translation', 'korean'], description: '한국어 번역 prompt',
+      typeFields: { body_text: '다음 텍스트를 자연스러운 한국어로 번역해주세요:\n\n{{text}}' },
+    },
+    {
+      type: 'command', name: 'Build Status Check', version: '1.0.0', status: 'approved',
+      authorEmail: 'admin@team.local', tags: ['ci', 'status'], description: 'CI 빌드 상태 확인 command',
+      typeFields: {
+        repo_path: 'commands/build-status-check.md',
+        install_target: '~/.claude/commands/build-status-check.md',
+        body_text: '# Build Status Check\n현재 CI 빌드 상태를 확인하고 실패 원인을 분석해주세요.',
+      },
+    },
+    {
+      type: 'skill', name: '코드리뷰 도우미', version: '1.0.0', status: 'approved',
+      authorEmail: 'admin@team.local', tags: ['review', 'korean'], description: '한국어 코드리뷰 자동화 스킬',
+      typeFields: { repo_path: 'skills/코드리뷰-도우미', install_target: '~/.claude/skills/코드리뷰-도우미/' },
+    },
+    {
+      type: 'mcp', name: 'GitHub MCP', version: '1.0.0', status: 'approved',
+      authorEmail: 'admin@team.local', tags: ['github', 'integration'], description: 'GitHub API MCP 서버',
+      typeFields: {
+        repo_url: 'https://github.com/team/mcp-github',
+        mcp_config: JSON.stringify({
+          mcpServers: { github: { command: 'node', args: ['dist/index.js'], env: { GITHUB_TOKEN: '<YOUR_TOKEN>' } } },
+        }),
+      },
+    },
+    {
+      type: 'skill', name: 'Alice WIP Skill', version: '0.1.0', status: 'draft',
+      authorEmail: 'alice@team.local', tags: ['wip'], description: 'alice WIP draft',
+      typeFields: {},
+    },
+    {
+      type: 'skill', name: 'Bob WIP Skill', version: '0.1.0', status: 'draft',
+      authorEmail: 'bob@team.local', tags: ['wip'], description: 'bob WIP draft',
+      typeFields: {},
+    },
   ]
 
   // T-34 정합 — bot 계정은 author 부여 금지 (assets 데이터에서 system_user 제외 보장)
@@ -95,14 +138,15 @@ const seedAssets = (emailToId: Map<string, string>): void => {
   }
 
   const upsert = sqlite.prepare(`
-    INSERT INTO assets (id, type, name, version, status, author_id, tags, description)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    INSERT INTO assets (id, type, name, version, status, author_id, tags, description, type_fields)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ON CONFLICT(name, version) DO UPDATE SET
       type        = excluded.type,
       status      = excluded.status,
       author_id   = excluded.author_id,
       tags        = excluded.tags,
-      description = excluded.description
+      description = excluded.description,
+      type_fields = excluded.type_fields
   `)
 
   const tx = sqlite.transaction(() => {
@@ -114,7 +158,11 @@ const seedAssets = (emailToId: Map<string, string>): void => {
         : null
       if (!authorId) throw new Error(`unknown author: ${a.authorEmail}`)
       const id = crypto.randomUUID()
-      upsert.run(id, a.type, a.name, a.version, a.status, authorId, JSON.stringify(a.tags), a.description)
+      upsert.run(
+        id, a.type, a.name, a.version, a.status, authorId,
+        JSON.stringify(a.tags), a.description,
+        JSON.stringify(a.typeFields ?? {}),
+      )
     }
   })
   tx()
@@ -124,7 +172,7 @@ const main = async (): Promise<void> => {
   const emailToId = await seedUsers()
   seedAssets(emailToId)
   // eslint-disable-next-line no-console
-  console.log('✅ Seed complete: 5 users + 7 assets (UPSERT idempotent)')
+  console.log('✅ Seed complete: 5 users + 8 assets (UPSERT idempotent) — M5: typeFields + GitHub MCP 추가')
   sqlite.close()
 }
 

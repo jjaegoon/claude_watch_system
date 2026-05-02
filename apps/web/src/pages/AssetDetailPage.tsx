@@ -1,8 +1,156 @@
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../api/client.js'
 import { TypeBadge } from '../components/TypeBadge.js'
 import type { Asset } from '../components/AssetCard.js'
+
+type DownloadInfo = {
+  type: string
+  name: string
+  repo_path?: string | null
+  install_target?: string
+  install_command?: string | null
+  body_text?: string
+  repo_url?: string | null
+  mcp_config?: string | null
+}
+
+function CopyButton({ label, text }: { label: string; text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = async () => {
+    try {
+      if (navigator.clipboard) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        // fallback: prompt
+        window.prompt('복사하세요 (Ctrl+C / Cmd+C):', text)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      window.alert('복사 실패 — 아래 텍스트를 직접 복사해 주세요:\n\n' + text)
+    }
+  }
+
+  return (
+    <button
+      onClick={handleCopy}
+      style={{
+        padding: '8px 16px', borderRadius: 6, border: '1px solid #e2e8f0',
+        background: copied ? '#d1fae5' : '#f8fafc', color: copied ? '#065f46' : '#374151',
+        cursor: 'pointer', fontSize: 13, fontWeight: 500, transition: 'all 0.15s',
+      }}
+    >
+      {copied ? '복사됨 ✓' : label}
+    </button>
+  )
+}
+
+function DownloadSection({ assetId }: { assetId: string }) {
+  const { data, isLoading, error } = useQuery({
+    queryKey: ['asset-download', assetId],
+    queryFn: async () => {
+      const res = await apiFetch(`/api/assets/${assetId}/download`)
+      if (!res.ok) {
+        const json = await res.json() as { error?: { message: string } }
+        throw new Error(json.error?.message ?? `HTTP ${res.status}`)
+      }
+      const json = await res.json() as { ok: boolean; data: DownloadInfo }
+      return json.data
+    },
+    enabled: !!assetId,
+    retry: false,
+  })
+
+  if (isLoading) return <p style={{ color: '#94a3b8', fontSize: 13 }}>다운로드 정보 로딩 중…</p>
+  if (error) return (
+    <p style={{ color: '#ef4444', fontSize: 13 }}>
+      다운로드 정보 로드 실패: {error instanceof Error ? error.message : '오류'}
+    </p>
+  )
+  if (!data) return null
+
+  return (
+    <div style={{ marginTop: 24, borderTop: '1px solid #f1f5f9', paddingTop: 20 }}>
+      <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: '#374151' }}>설치 / 다운로드</p>
+
+      {data.type === 'skill' && (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+          {data.install_command && (
+            <div>
+              <p style={{ margin: '0 0 6px', fontSize: 12, color: '#64748b' }}>
+                설치 위치: <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>{data.install_target}</code>
+              </p>
+              <CopyButton label="git clone 명령 복사" text={data.install_command} />
+            </div>
+          )}
+          {!data.install_command && (
+            <p style={{ fontSize: 12, color: '#94a3b8' }}>설치 경로: {data.install_target ?? '정보 없음'}</p>
+          )}
+        </div>
+      )}
+
+      {data.type === 'prompt' && (
+        <div>
+          {data.body_text && (
+            <>
+              <pre style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6,
+                padding: '10px 14px', fontSize: 12, color: '#334155',
+                maxHeight: 160, overflow: 'auto', whiteSpace: 'pre-wrap' as const,
+                marginBottom: 8,
+              }}>{data.body_text}</pre>
+              <CopyButton label="텍스트 복사" text={data.body_text} />
+            </>
+          )}
+          {!data.body_text && <p style={{ fontSize: 12, color: '#94a3b8' }}>본문 내용 없음</p>}
+        </div>
+      )}
+
+      {data.type === 'command' && (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+          <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+            설치 위치: <code style={{ background: '#f1f5f9', padding: '1px 4px', borderRadius: 3 }}>{data.install_target}</code>
+          </p>
+          {data.body_text && (
+            <>
+              <pre style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6,
+                padding: '10px 14px', fontSize: 12, color: '#334155',
+                maxHeight: 120, overflow: 'auto', whiteSpace: 'pre-wrap' as const,
+              }}>{data.body_text}</pre>
+              <CopyButton label="파일 내용 복사" text={data.body_text} />
+            </>
+          )}
+        </div>
+      )}
+
+      {data.type === 'mcp' && (
+        <div style={{ display: 'flex', flexDirection: 'column' as const, gap: 10 }}>
+          {data.repo_url && (
+            <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>
+              저장소: <a href={data.repo_url} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb' }}>{data.repo_url}</a>
+            </p>
+          )}
+          {data.mcp_config && (
+            <>
+              <p style={{ margin: 0, fontSize: 12, color: '#64748b' }}>claude_desktop_config.json 설정:</p>
+              <pre style={{
+                background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 6,
+                padding: '10px 14px', fontSize: 12, color: '#334155',
+                maxHeight: 140, overflow: 'auto', whiteSpace: 'pre-wrap' as const,
+              }}>{data.mcp_config}</pre>
+              <CopyButton label="설치 명령 복사 (JSON)" text={data.mcp_config} />
+            </>
+          )}
+          {!data.mcp_config && <p style={{ fontSize: 12, color: '#94a3b8' }}>설치 설정 정보 없음</p>}
+        </div>
+      )}
+    </div>
+  )
+}
 
 export function AssetDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -76,7 +224,7 @@ export function AssetDetailPage() {
             )}
 
             {Object.keys(typeFields).length > 0 && (
-              <div>
+              <div style={{ marginBottom: 4 }}>
                 <p style={{ margin: '0 0 8px', fontSize: 13, fontWeight: 600, color: '#374151' }}>타입 필드</p>
                 <table style={{ width: '100%', borderCollapse: 'collapse' as const, fontSize: 13 }}>
                   <tbody>
@@ -90,6 +238,8 @@ export function AssetDetailPage() {
                 </table>
               </div>
             )}
+
+            {id && <DownloadSection assetId={id} />}
           </div>
         )}
       </div>
