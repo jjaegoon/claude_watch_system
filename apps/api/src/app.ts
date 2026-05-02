@@ -3,6 +3,7 @@ import { cors } from 'hono/cors'
 import { logger } from './middleware/logger.js'
 import { csrfGuard } from './middleware/csrfGuard.js'
 import { healthRoute } from './routes/health.js'
+import { authRoute } from './routes/auth.js'
 
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
   .split(',')
@@ -27,6 +28,7 @@ app.use('*', logger)
 app.use('*', csrfGuard)
 
 app.route('/health', healthRoute)
+app.route('/auth', authRoute)
 
 // 명시적 not-found 핸들러 — conventions §API 응답 형식 정합
 app.notFound((c) =>

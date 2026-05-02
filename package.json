@@ -10,6 +10,6 @@
     "sync":    "pnpm --filter @team-claude/api sync"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["better-sqlite3", "esbuild"]
+    "onlyBuiltDependencies": ["bcrypt", "better-sqlite3", "esbuild"]
   }
 }

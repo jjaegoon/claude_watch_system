@@ -37,3 +37,28 @@ export const getWebhookPendingCount = (): number => {
     .get('pending') as { c: number } | undefined
   return row?.c ?? 0
 }
+
+// ── User row 타입·조회 (Step 3 인증) ─────────────────────────────────────
+export type UserRole = 'member' | 'reviewer' | 'admin' | 'system_user'
+export type UserRow = {
+  id: string
+  email: string
+  name: string
+  local_id: string
+  role: UserRole
+  password_hash: string
+  is_bot: number
+  created_at: number
+}
+
+export const findUserByEmail = (email: string): UserRow | undefined => {
+  return sqlite
+    .prepare('SELECT * FROM users WHERE email = ?')
+    .get(email) as UserRow | undefined
+}
+
+export const findUserById = (id: string): UserRow | undefined => {
+  return sqlite
+    .prepare('SELECT * FROM users WHERE id = ?')
+    .get(id) as UserRow | undefined
+}
