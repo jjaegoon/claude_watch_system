@@ -378,3 +378,39 @@ pnpm rebuild better-sqlite3
 - precommit-check.sh check 항목 추가 후보 (T-39): `node --version` + `.node` 바이너리 ABI 일치 검증
 
 **발견**: M1 Step 7 8단계 직전, 2026-05-02 (사용자 셸 검증 시점). 누적 gotcha 17건.
+
+## #18 ORDER BY created_at 단독 → 동일 초 삽입 시 비결정적 순서 ★★★★
+
+**증상**: `asset_versions`·`webhook_jobs` 등 `unixepoch()` 저장 컬럼을 `ORDER BY created_at DESC LIMIT 1`로 정렬 시, 동일 초 내 여러 INSERT가 발생하면 어느 행이 반환될지 불결정. M2 assetStatusService.test.ts에서 반려(status=draft) 버전 조회 시 같은 초에 삽입된 submitForReview 버전(change_note=NULL)이 반환되어 테스트 실패.
+
+**stack trace 인용** (M2 Step 2 assetStatusService.test.ts):
+```
+× in_review → draft: 반려 reason_code 저장 확인
+  AssertionError: expected null to equal '{"reason_code":"R-03","note":null}'
+  // ORDER BY created_at DESC LIMIT 1이 submitForReview 버전(change_note=NULL)을 반환
+```
+
+**원인**: `unixepoch()` = 초 단위 정밀도. 동일 트랜잭션 또는 1초 이내 연속 INSERT 시 created_at 값이 동일. SQLite에서 ORDER BY created_at만 사용하면 rowid(물리적 삽입 순서)로 정렬되는 동작이 보장되지 않음(구현 의존).
+
+**처방**:
+```sql
+-- Bad: created_at 동점 시 불결정
+ORDER BY created_at DESC LIMIT 1
+
+-- Good: rowid는 삽입 순서 보장 (SQLite 물리적 순서)
+ORDER BY rowid DESC LIMIT 1
+-- 또는 복합 정렬 (readable + deterministic)
+ORDER BY created_at DESC, rowid DESC LIMIT 1
+```
+
+**영구 차단**:
+- `asset_versions`·`webhook_jobs` 등 `unixepoch()` 컬럼을 단독 ORDER BY로 사용 금지
+- 항상 `ORDER BY created_at, rowid` 또는 `ORDER BY rowid`로 타이브레이커 추가
+- webhookWorker.ts의 pending job 선택 쿼리: `ORDER BY created_at, rowid LIMIT 1` 적용 완료
+- assetStatusService.test.ts change_note 검증: `ORDER BY rowid DESC LIMIT 1` 적용 완료
+
+**적용 파일**:
+- `apps/api/src/workers/webhookWorker.ts` — pending job 선택 쿼리
+- `apps/api/src/services/assetStatusService.test.ts` — change_note 검증 쿼리
+
+**발견**: M2 Step 2 + Step 3 빌드 중, 2026-05-02. 누적 gotcha 18건.
