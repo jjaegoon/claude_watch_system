@@ -56,6 +56,7 @@
 | T-36 | 페르소나 cadence — 분기 인간 + 월 LLM-as-Judge |
 | T-37 | 게이트 자동 — B-1·B-2·M2 자동; M1·M3·M4 사용자 어드민 |
 | T-38 | settings.json deny 라이프사이클(pre/post/phase-out) 정합. Globbed 패턴 우선 |
+| T-40 후보 | packages/db ESM export 패턴 정식 결정 (옵션 A build/dist · B exports field · C tsconfig alias). Step 4 진입 직전 결정 의무 |
 
 ## Non-decisions (자주 헷갈리는 것)
 
