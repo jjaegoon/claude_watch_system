@@ -55,13 +55,13 @@ authRoute.post('/login', loginRateLimit, async (c) => {
   const { email, password } = parsed.data
   const user = findUserByEmail(email)
   // T-34 정합 — bot 계정 로그인 차단
-  if (!user || user.is_bot === 1 || user.role === 'system_user') {
+  if (!user || user.isBot || user.role === 'system_user') {
     return c.json(
       { ok: false, error: { code: 'UNAUTHORIZED', message: '잘못된 자격 증명' } },
       401,
     )
   }
-  const ok = await bcrypt.compare(password, user.password_hash)
+  const ok = await bcrypt.compare(password, user.passwordHash)
   if (!ok) {
     return c.json(
       { ok: false, error: { code: 'UNAUTHORIZED', message: '잘못된 자격 증명' } },
@@ -131,7 +131,7 @@ authRoute.post('/refresh', async (c) => {
 
   // user 정보 갱신 (role 변경 가능성)
   const user = findUserById(payload.sub)
-  if (!user || user.is_bot === 1) {
+  if (!user || user.isBot) {
     return c.json(
       {
         ok: false,

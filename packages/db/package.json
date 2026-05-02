@@ -2,6 +2,9 @@
   "name": "@team-claude/db",
   "version": "0.0.1",
   "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
   "scripts": {
     "migrate":   "tsx src/migrate.ts",
     "generate":  "drizzle-kit generate",
@@ -21,8 +24,21 @@
     "typescript":            "^5.8.0"
   },
   "exports": {
-    ".":         "./src/index.ts",
-    "./schema":  "./src/schema.ts",
-    "./queries": "./src/queries.ts"
+    ".": {
+      "types":   "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./schema": {
+      "types":   "./src/schema.ts",
+      "default": "./src/schema.ts"
+    },
+    "./client": {
+      "types":   "./src/client.ts",
+      "default": "./src/client.ts"
+    },
+    "./queries": {
+      "types":   "./src/queries.ts",
+      "default": "./src/queries.ts"
+    }
   }
 }

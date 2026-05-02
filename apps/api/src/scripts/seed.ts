@@ -1,5 +1,5 @@
 import bcrypt from 'bcrypt'
-import { sqlite } from '../lib/db.js'
+import { sqlite } from '@team-claude/db/client'
 
 /**
  * 마스터 보강 ⓑ — 5 user + 6 asset.

@@ -1,6 +1,6 @@
 import bcrypt from 'bcrypt'
 import * as readline from 'node:readline/promises'
-import { sqlite } from '../lib/db.js'
+import { sqlite } from '@team-claude/db/client'
 
 /**
  * T-18 admin 비밀번호 재설정 CLI.

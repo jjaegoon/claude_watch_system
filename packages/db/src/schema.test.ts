@@ -2,9 +2,9 @@ import Database from 'better-sqlite3'
 import { drizzle } from 'drizzle-orm/better-sqlite3'
 import assert from 'node:assert/strict'
 import type { InferSelectModel, InferInsertModel } from 'drizzle-orm'
-import * as schema from './schema'
-import type { UsageEventMetadata } from './schema'
-import { toRating, fromRating } from './utils'
+import * as schema from './schema.js'
+import type { UsageEventMetadata } from './schema.js'
+import { toRating, fromRating } from './utils.js'
 
 // ── 컴파일 타임 타입 검증 ──────────────────────────────────────────────────
 type UserSelect = InferSelectModel<typeof schema.users>
