@@ -3,6 +3,7 @@ import { resolve, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { serve } from '@hono/node-server'
 import { app } from './app.js'
+import { startWorker } from './workers/webhookWorker.js'
 
 // Load .env file (dev convenience — no new dependencies)
 try {
@@ -21,7 +22,15 @@ try {
 
 const port = Number(process.env.PORT ?? 3000)
 
-serve({ fetch: app.fetch, port }, (info) => {
+const server = serve({ fetch: app.fetch, port }, (info) => {
   // eslint-disable-next-line no-console
   console.log(`[team-claude-api] listening on http://localhost:${info.port}`)
+})
+
+// T-15: webhook_jobs 폴링 워커 시작
+const workerTimer = startWorker()
+
+process.on('SIGTERM', () => {
+  clearInterval(workerTimer)
+  server.close()
 })
