@@ -1,10 +1,9 @@
-import { Hono } from 'hono'
 import { serve } from '@hono/node-server'
+import { app } from './app.js'
 
-const app = new Hono()
+const port = Number(process.env.PORT ?? 3000)
 
-app.get('/', (c) => c.text('Hello'))
-
-serve({ fetch: app.fetch, port: 3000 }, (info) => {
-  console.log(`Server running on http://localhost:${info.port}`)
+serve({ fetch: app.fetch, port }, (info) => {
+  // eslint-disable-next-line no-console
+  console.log(`[team-claude-api] listening on http://localhost:${info.port}`)
 })
