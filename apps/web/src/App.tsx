@@ -4,17 +4,16 @@ import { initApiClient } from './api/client.js'
 import { LoginPage } from './pages/LoginPage.js'
 import { CatalogListPage } from './pages/CatalogListPage.js'
 import { AssetDetailPage } from './pages/AssetDetailPage.js'
-import { useEffect } from 'react'
+import { useRef } from 'react'
 
 function AppRoutes() {
   const { state, refreshToken } = useAuth()
 
-  useEffect(() => {
-    initApiClient(
-      () => state.accessToken,
-      refreshToken,
-    )
-  }, [state.accessToken, refreshToken])
+  // Use a ref so the token getter always reads the latest token,
+  // avoiding a race where CatalogListPage queries fire before useEffect runs.
+  const stateRef = useRef(state)
+  stateRef.current = state
+  initApiClient(() => stateRef.current.accessToken, refreshToken)
 
   if (state.status === 'loading') {
     return (

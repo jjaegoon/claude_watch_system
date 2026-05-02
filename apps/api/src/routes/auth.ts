@@ -23,7 +23,7 @@ const refreshCookieOptions = () =>
     httpOnly: true,
     secure: isProd(),
     sameSite: 'Strict' as const,
-    path: '/auth',
+    path: '/',
     maxAge: REFRESH_MAX_AGE,
   }) as const
 
