@@ -82,6 +82,7 @@ const seedAssets = (emailToId: Map<string, string>): void => {
     { type: 'skill',   name: 'API Test Generator',  version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['testing', 'api'],        description: 'API 단위 테스트 자동 생성' },
     { type: 'prompt',  name: 'Korean Translation',  version: '1.0.0', status: 'approved', authorEmail: 'alice@team.local', tags: ['translation', 'korean'], description: '한국어 번역 prompt' },
     { type: 'command', name: 'Build Status Check',  version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['ci', 'status'],          description: 'CI 빌드 상태 확인 command' },
+    { type: 'skill',   name: '코드리뷰 도우미',       version: '1.0.0', status: 'approved', authorEmail: 'admin@team.local', tags: ['review', 'korean'],      description: '한국어 코드리뷰 자동화 스킬' },
     { type: 'skill',   name: 'Alice WIP Skill',     version: '0.1.0', status: 'draft',    authorEmail: 'alice@team.local', tags: ['wip'],                   description: 'alice WIP draft' },
     { type: 'skill',   name: 'Bob WIP Skill',       version: '0.1.0', status: 'draft',    authorEmail: 'bob@team.local',   tags: ['wip'],                   description: 'bob WIP draft' },
   ]
@@ -123,7 +124,7 @@ const main = async (): Promise<void> => {
   const emailToId = await seedUsers()
   seedAssets(emailToId)
   // eslint-disable-next-line no-console
-  console.log('✅ Seed complete: 5 users + 6 assets (UPSERT idempotent)')
+  console.log('✅ Seed complete: 5 users + 7 assets (UPSERT idempotent)')
   sqlite.close()
 }
 

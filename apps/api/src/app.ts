@@ -4,6 +4,7 @@ import { logger } from './middleware/logger.js'
 import { csrfGuard } from './middleware/csrfGuard.js'
 import { healthRoute } from './routes/health.js'
 import { authRoute } from './routes/auth.js'
+import { assetsRoute } from './routes/assets.js'
 
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
   .split(',')
@@ -29,6 +30,7 @@ app.use('*', csrfGuard)
 
 app.route('/health', healthRoute)
 app.route('/auth', authRoute)
+app.route('/assets', assetsRoute)
 
 // 명시적 not-found 핸들러 — conventions §API 응답 형식 정합
 app.notFound((c) =>

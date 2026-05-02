@@ -124,7 +124,11 @@ check_blocklist() {
   # Concatenate fork-bomb signature ":\(\)\{ ... :|" via parts to avoid scan-secrets type tools flagging this script.
   local fb_a=':\(' fb_b='\)\{[[:space:]]*:'
   local pattern="rm -rf /|dd if=/dev/|mkfs\\.|find [^|]+ -delete|shred -|chmod 0[0-7]{3}|${fb_a}${fb_b}|DROP[[:space:]]+TABLE|>[[:space:]]*/etc/"
-  if echo "$diff" | grep -qE "$pattern"; then
+  # 추가된 줄(+)만 검사. 삭제(-) 및 컨텍스트( ) 라인 제외 — precommit-check.sh 자체 패턴 문자열이 컨텍스트로 노출되는 것 방지.
+  # migrations/*.sql의 DROP TABLE IF EXISTS는 idempotent 관리 패턴으로 허용 (gotcha #14 정합).
+  local filtered_diff
+  filtered_diff=$(echo "$diff" | grep "^+" | grep -v "^+++" | grep -vE "DROP[[:space:]]+TABLE[[:space:]]+IF[[:space:]]+EXISTS" || true)
+  if echo "$filtered_diff" | grep -qE "$pattern"; then
     add_result "blocklist" "FAIL" "blocklist pattern in staged diff"
   else
     add_result "blocklist" "PASS" "no blocklist patterns"

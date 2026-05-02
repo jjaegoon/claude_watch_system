@@ -254,3 +254,69 @@ export const signRefreshToken = (payload: JwtPayload): string =>
 - M3 skill_trigger token(향후) — 짧은 시간 내 다중 발급 가능
 
 **발견**: M1 Step 3, 2026-05-02 (Step 3 episode §함정 ① + tokenService TDD 8 tests)
+
+## #13 Drizzle ORM은 FTS5 MATCH 미지원 → raw SQL prepared statement 필수
+
+**증상**: `db.select().from(assets).where(sql`assets_fts MATCH ${q}`)` 같은 Drizzle ORM query builder로 FTS5 MATCH 절 작성 시 타입 오류 또는 런타임 오류. Drizzle이 FTS5 가상 테이블을 일반 테이블처럼 처리하여 MATCH 연산자를 지원하지 않음.
+
+**처방**:
+```ts
+// FTS5 서브쿼리는 반드시 raw SQL prepared statement 사용
+const sql = `
+  SELECT a.id, a.name, ...
+  FROM assets a
+  WHERE a.rowid IN (SELECT rowid FROM assets_fts WHERE assets_fts MATCH ?)
+`
+const rows = db.prepare(sql).all(ftsQuery) as AssetRow[]
+```
+
+**영구 차단**: FTS5 MATCH를 포함하는 모든 쿼리는 Drizzle ORM query builder 대신 `db.prepare(sql).all(...)` raw SQL 패턴 사용 의무. assetQueryService.ts에 적용 완료.
+
+**발견**: M1 Step 4, 2026-05-02
+
+## #14 FTS5 external content trigger의 DELETE/UPDATE 패턴 — `INSERT ... VALUES('delete', ...)` 필수
+
+**증상**: external content FTS5 테이블(`content='assets'`)의 DELETE trigger에서 `DELETE FROM assets_fts WHERE rowid = old.rowid`를 사용하면 FTS5 인덱스가 실제로 갱신되지 않음. 삭제된 자산이 여전히 FTS MATCH에 매칭됨.
+
+**원인**: FTS5 external content 테이블은 DML(INSERT/UPDATE/DELETE) 직접 실행 불가. FTS5 특수 명령어 문법을 통해 인덱스를 조작해야 함.
+
+**처방**:
+```sql
+-- DELETE trigger: 'delete' 특수 명령 사용
+CREATE TRIGGER assets_ad AFTER DELETE ON assets BEGIN
+  INSERT INTO assets_fts(assets_fts, rowid, name, description)
+  VALUES ('delete', old.rowid, old.name, COALESCE(old.description, ''));
+END;
+
+-- UPDATE trigger: old 삭제 후 new 삽입 (두 단계)
+CREATE TRIGGER assets_au AFTER UPDATE ON assets BEGIN
+  INSERT INTO assets_fts(assets_fts, rowid, name, description)
+  VALUES ('delete', old.rowid, old.name, COALESCE(old.description, ''));
+  INSERT INTO assets_fts(rowid, name, description)
+  VALUES (new.rowid, new.name, COALESCE(new.description, ''));
+END;
+```
+
+**영구 차단**: FTS5 external content 테이블 trigger 작성 시 DELETE는 반드시 `INSERT ... VALUES('delete', rowid, ...)` 패턴. `DELETE FROM fts WHERE rowid = X` 패턴 절대 사용 금지. migration 010에 적용 완료.
+
+**연관**: gotcha #13 (Drizzle + FTS5 raw SQL). FTS5 spec §external content table.
+
+**발견**: M1 Step 4, 2026-05-02
+
+## #15 macOS NFD vs Linux NFC 한글 불일치 — `normalize('NFC')` 필수
+
+**증상**: macOS 파일시스템은 한글 문자열을 NFD(분해형)로 저장. `'코드리뷰'.length` === macOS에서 NFD일 경우 8(초성+중성+종성 분해). 서버(Linux)에서는 NFC(결합형)로 `'코드리뷰'.length` === 4. `buildFts5Query`의 `< 3` 길이 체크가 환경에 따라 다르게 동작.
+
+**처방**:
+```ts
+export const buildFts5Query = (raw: string): string => {
+  if (!raw) return ''
+  const normalized = raw.normalize('NFC')  // NFD → NFC (macOS → Linux 정합)
+  if (normalized.length < 3) return ''     // trigram 최소 3자
+  // ...
+}
+```
+
+**영구 차단**: 한글 입력을 처리하는 모든 문자열 함수에서 `normalize('NFC')` 선행 의무. searchService.ts에 적용 완료. 특히 length 비교·substring 연산·FTS5 query 빌드 전에 정규화 필수.
+
+**발견**: M1 Step 4, 2026-05-02 (C-5 자율 체크리스트 항목)
