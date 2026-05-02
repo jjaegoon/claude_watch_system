@@ -414,3 +414,36 @@ ORDER BY created_at DESC, rowid DESC LIMIT 1
 - `apps/api/src/services/assetStatusService.test.ts` — change_note 검증 쿼리
 
 **발견**: M2 Step 2 + Step 3 빌드 중, 2026-05-02. 누적 gotcha 18건.
+
+## #19 staged_secrets FAIL on git-rm deletions — `--diff-filter=ACMR` 처방 (T-39b) ★★★
+
+**증상**: `git rm <file>` 후 precommit-check.sh 실행 시 `staged_secrets` FAIL.
+```
+check_staged_secrets: fatal: Path '<deleted_file>' does not exist in the index
+```
+check가 `git diff --cached --name-only`(삭제 포함 전체 staged 목록) 순회 → 삭제 파일에 `git show :<file>` 실행 → fatal exit → pipefail → FAIL 판정.
+
+**원인**: `git diff --cached --name-only`는 DELETED 파일도 포함. 삭제된 파일은 index에서 이미 제거되어 `git show :deleted_file`가 non-zero 종료 → bash `set -e` 또는 pipefail로 FAIL 전파.
+
+**처방 (workaround)**: 삭제 파일을 별도 commit으로 분리:
+```bash
+git restore --staged <deleted_file>   # 삭제 unstage
+git commit <other staged files>       # 나머지 먼저 commit
+git rm <file> && git commit           # 삭제 단독 commit
+```
+
+**정식 fix (T-39b)**: check_staged_secrets 함수에서 삭제 파일 필터링:
+```bash
+# Bad: 삭제 파일 포함
+staged="$(git diff --cached --name-only)"
+# Good: Added/Copied/Modified/Renamed만 — Deleted 제외
+staged="$(git diff --cached --diff-filter=ACMR --name-only)"
+```
+
+**영구 차단**:
+- precommit-check.sh check_staged_secrets 또는 신규 staged file 스캔 함수 작성 시 `--diff-filter=ACMR` 필수
+- 단순 `git rm` 포함 commit 전에는 삭제 파일을 별도 commit으로 분리하는 것이 가장 빠른 우회책
+
+**참조**: gotcha #16 (hooks/*.sh 패턴 정의 컨텍스트 라인 false-positive) · gotcha #17 (ERR_DLOPEN_FAILED) 와 유사한 메타 함정 영역. T-39b 공식 ADR 후보.
+
+**발견**: M1 Step 7 + Phase O 진입 후 Cowork 확정, 2026-05-02~2026-05-03. 누적 gotcha 19건.

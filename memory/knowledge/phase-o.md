@@ -11,8 +11,8 @@ Phase O = D+45~D+50 (약 2026-06-05~2026-06-10).
 | BetterStack token | ⏳ 사용자 발급 대기 (`BETTERSTACK_TOKEN` env) |
 | Anthropic API key | ⏳ T-34 보류 중 — Phase O 재평가까지 불필요 |
 | T-34 재평가 | 📅 2026-06-15 09:00 KST (Cowork `d29-bot-activation-briefing` 영구 등록) |
-| 분기 인간 페르소나 | 📅 ~2026-07-30 (D+90 기준, T-36) |
-| 월 LLM-as-Judge | 📅 첫 회 ~2026-06-03 (D+43, `evals/regression_test.py`) |
+| 분기 인간 페르소나 | 📅 2026-07-30 09:00 KST (Cowork quarterly-human-persona-review 영구 등록) |
+| 월 LLM-as-Judge | 📅 2026-06-01 09:00 KST (Cowork monthly-llm-as-judge 영구 등록, `evals/regression_test.py`) |
 
 ## Phase O 운영 절차
 
