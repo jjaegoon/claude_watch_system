@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { sqlite } from '@team-claude/db/client'
 import { requireAuth } from '../middleware/auth.js'
 import { assetListQuerySchema, assetIdParamSchema, createAssetSchema, updateAssetSchema, statusTransitionSchema } from '../schemas/asset.js'
-import { listAssets, getAssetById } from '../services/assetQueryService.js'
+import { listAssets, getAssetById, getAssetStats } from '../services/assetQueryService.js'
 import { buildFts5Query } from '../services/searchService.js'
 import { createAsset, updateAsset } from '../services/assetWriteService.js'
 import { transitionStatus, submitForReview } from '../services/assetStatusService.js'
@@ -228,6 +228,9 @@ assetsRoute.get('/:id/download', async (c) => {
   const assetName = asset.name as string
   const assetType = asset.type as string
 
+  // T-45: ASSETS_REPO_URL env 실제 치환. 미설정 시 install_command=null (GR-5 정합)
+  const assetsRepoUrl = process.env.ASSETS_REPO_URL?.replace(/\/$/, '') ?? null
+
   if (assetType === 'skill') {
     const repoPath = typeFields.repo_path as string | undefined
     const installTarget = (typeFields.install_target as string | undefined)
@@ -237,8 +240,8 @@ assetsRoute.get('/:id/download', async (c) => {
       name: assetName,
       repo_path: repoPath ?? null,
       install_target: installTarget,
-      install_command: repoPath
-        ? `git clone <ASSETS_REPO_URL>/${repoPath} "${installTarget}"`
+      install_command: (repoPath && assetsRepoUrl)
+        ? `git clone ${assetsRepoUrl}/${repoPath} "${installTarget}"`
         : null,
     }
   } else if (assetType === 'prompt') {
@@ -315,5 +318,8 @@ assetsRoute.get('/:id', async (c) => {
     } catch { /* fire-and-forget */ }
   }
 
-  return c.json({ ok: true, data: asset })
+  // T-46: 조회수·다운로드수 통합 (L2 사용량 가시화)
+  const stats = getAssetStats(parsed.data.id, sqlite)
+
+  return c.json({ ok: true, data: { ...asset, view_count: stats.view_count, download_count: stats.download_count } })
 })

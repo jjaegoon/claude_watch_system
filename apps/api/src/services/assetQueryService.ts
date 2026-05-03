@@ -44,6 +44,29 @@ const decodeCursor = (s: string): CursorPayload | null => {
   }
 }
 
+export type AssetStats = {
+  view_count: number
+  download_count: number
+}
+
+/** asset_view + asset_download 이벤트 집계 (T-46). */
+export const getAssetStats = (
+  assetId: string,
+  db: InstanceType<typeof Database>,
+): AssetStats => {
+  const row = db.prepare(`
+    SELECT
+      COUNT(CASE WHEN event_type = 'asset_view' THEN 1 END) AS view_count,
+      COUNT(CASE WHEN event_type = 'asset_download' THEN 1 END) AS download_count
+    FROM usage_events
+    WHERE asset_id = ?
+  `).get(assetId) as { view_count: number; download_count: number } | undefined
+  return {
+    view_count: row?.view_count ?? 0,
+    download_count: row?.download_count ?? 0,
+  }
+}
+
 /** db 파라미터: 프로덕션은 packages/db client.ts sqlite, 테스트는 in-memory sqlite. */
 export const getAssetById = async (
   assetId: string,

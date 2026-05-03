@@ -16,6 +16,12 @@ type DownloadInfo = {
   mcp_config?: string | null
 }
 
+type AssetWithStats = {
+  view_count?: number
+  download_count?: number
+  [key: string]: unknown
+}
+
 function CopyButton({ label, text }: { label: string; text: string }) {
   const [copied, setCopied] = useState(false)
 
@@ -89,7 +95,12 @@ function DownloadSection({ assetId }: { assetId: string }) {
               <CopyButton label="git clone 명령 복사" text={data.install_command} />
             </div>
           )}
-          {!data.install_command && (
+          {!data.install_command && data.repo_path && (
+            <p style={{ fontSize: 12, color: '#f59e0b' }}>
+              ⚠️ 저장소 URL 미설정 — 관리자에게 문의하여 ASSETS_REPO_URL 환경 변수를 설정하세요.
+            </p>
+          )}
+          {!data.install_command && !data.repo_path && (
             <p style={{ fontSize: 12, color: '#94a3b8' }}>설치 경로: {data.install_target ?? '정보 없음'}</p>
           )}
         </div>
@@ -177,7 +188,7 @@ export function AssetDetailPage() {
         const json = await res.json() as { error?: { message: string } }
         throw new Error(json.error?.message ?? `HTTP ${res.status}`)
       }
-      const json = await res.json() as { ok: boolean; data: Asset }
+      const json = await res.json() as { ok: boolean; data: Asset & AssetWithStats }
       return json.data
     },
     enabled: !!id,
@@ -218,6 +229,9 @@ export function AssetDetailPage() {
               <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, color: '#1e293b' }}>{data.name}</h1>
               <span style={{ color: '#94a3b8', fontSize: 13 }}>v{data.version}</span>
               <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 12, background: '#f1f5f9', color: '#475569' }}>{data.status}</span>
+              <span style={{ color: '#94a3b8', fontSize: 12 }}>
+                조회 {data.view_count ?? 0} · 다운로드 {data.download_count ?? 0}
+              </span>
             </div>
 
             {data.description && (

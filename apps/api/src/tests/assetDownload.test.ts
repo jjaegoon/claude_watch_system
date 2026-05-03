@@ -2,6 +2,9 @@
  * Phase-O-hotfix U-C1 — GET /assets/:id/download 다운로드 이벤트 기록 검증
  * - bot User-Agent 차단
  * - 404 시 INSERT 없음
+ * T-45 CLI C-1 — ASSETS_REPO_URL env 치환 검증
+ * - 설정 시 실제 URL 포함 install_command
+ * - 미설정 시 install_command=null
  */
 import { describe, it, expect, beforeAll } from 'vitest'
 import { app } from '../app.js'
@@ -36,6 +39,73 @@ beforeAll(async () => {
   })
   const listJson = await listRes.json() as { ok: boolean; data: { items: Array<{ id: string }> } }
   approvedAssetId = listJson.data.items[0]!.id
+})
+
+describe('GET /assets/:id/download — T-45 CLI C-1: ASSETS_REPO_URL env 치환', () => {
+  it('ASSETS_REPO_URL 설정 시 install_command에 실제 URL 포함', async () => {
+    process.env.ASSETS_REPO_URL = 'https://github.com/test-org/assets'
+
+    // skill 타입 자산 조회
+    const listRes = await app.request('/assets?type=skill', {
+      headers: { Authorization: `Bearer ${accessToken}`, Origin: ORIGIN, 'X-Forwarded-For': IP },
+    })
+    const listJson = await listRes.json() as { ok: boolean; data: { items: Array<{ id: string }> } }
+    const skillAssetId = listJson.data.items[0]!.id
+
+    const res = await app.request(`/assets/${skillAssetId}/download`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Origin: ORIGIN, 'X-Forwarded-For': IP },
+    })
+    const json = await res.json() as { ok: boolean; data: { install_command: string | null } }
+
+    expect(res.status).toBe(200)
+    expect(json.data.install_command).toContain('https://github.com/test-org/assets')
+    expect(json.data.install_command).not.toContain('<ASSETS_REPO_URL>')
+
+    delete process.env.ASSETS_REPO_URL
+  })
+
+  it('ASSETS_REPO_URL 미설정 시 install_command=null', async () => {
+    delete process.env.ASSETS_REPO_URL
+
+    const listRes = await app.request('/assets?type=skill', {
+      headers: { Authorization: `Bearer ${accessToken}`, Origin: ORIGIN, 'X-Forwarded-For': IP },
+    })
+    const listJson = await listRes.json() as { ok: boolean; data: { items: Array<{ id: string }> } }
+    const skillAssetId = listJson.data.items[0]!.id
+
+    const res = await app.request(`/assets/${skillAssetId}/download`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Origin: ORIGIN, 'X-Forwarded-For': IP },
+    })
+    const json = await res.json() as { ok: boolean; data: { install_command: string | null } }
+
+    expect(res.status).toBe(200)
+    expect(json.data.install_command).toBeNull()
+  })
+
+  it('ASSETS_REPO_URL 트레일링 슬래시 제거', async () => {
+    process.env.ASSETS_REPO_URL = 'https://github.com/test-org/assets/'
+
+    const listRes = await app.request('/assets?type=skill', {
+      headers: { Authorization: `Bearer ${accessToken}`, Origin: ORIGIN, 'X-Forwarded-For': IP },
+    })
+    const listJson = await listRes.json() as { ok: boolean; data: { items: Array<{ id: string }> } }
+    const skillAssetId = listJson.data.items[0]!.id
+
+    const res = await app.request(`/assets/${skillAssetId}/download`, {
+      headers: { Authorization: `Bearer ${accessToken}`, Origin: ORIGIN, 'X-Forwarded-For': IP },
+    })
+    const json = await res.json() as { ok: boolean; data: { install_command: string | null } }
+
+    // 트레일링 슬래시 제거로 경로에 double-slash 없음 (https:// 프로토콜 제외)
+    const urlPart = json.data.install_command ?? ''
+    const afterClone = urlPart.replace('git clone ', '')
+    expect(afterClone.startsWith('https://')).toBe(true)
+    // 호스트 이후 경로에 // 없음
+    const pathPart = afterClone.replace(/^https?:\/\/[^/]+/, '')
+    expect(pathPart).not.toContain('//')
+
+    delete process.env.ASSETS_REPO_URL
+  })
 })
 
 describe('GET /assets/:id/download — asset_download INSERT (Phase-O-hotfix U-C1)', () => {
