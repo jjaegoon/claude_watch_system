@@ -8,6 +8,8 @@ import { assetsRoute } from './routes/assets.js'
 import { webhookRoute } from './routes/webhookRoute.js'
 import { hooksRoute } from './routes/hooksRoute.js'
 import { statsRoute } from './routes/statsRoute.js'
+import { notificationsRoute } from './routes/notifications.js'
+import { feedbackRoute } from './routes/feedback.js'
 
 const allowedOrigins = (process.env.CORS_ALLOWED_ORIGINS ?? '')
   .split(',')
@@ -37,6 +39,8 @@ app.route('/hooks', hooksRoute)     // T-13: Hook 이벤트 수신 (Bearer auth,
 app.route('/assets', webhookRoute)  // POST /assets/sync (HMAC auth, no requireAuth)
 app.route('/assets', assetsRoute)
 app.route('/stats', statsRoute)
+app.route('/notifications', notificationsRoute)
+app.route('/feedback', feedbackRoute)
 
 // 명시적 not-found 핸들러 — conventions §API 응답 형식 정합
 app.notFound((c) =>

@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { apiFetch } from '../api/client.js'
 import { TypeBadge } from '../components/TypeBadge.js'
+import { FeedbackModal } from '../components/FeedbackModal.js'
 import type { Asset } from '../components/AssetCard.js'
 
 type DownloadInfo = {
@@ -178,6 +179,7 @@ function DownloadSection({ assetId }: { assetId: string }) {
 export function AssetDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['asset', id],
@@ -265,10 +267,29 @@ export function AssetDetailPage() {
               </div>
             )}
 
-            {id && <DownloadSection assetId={id} />}
+            {id && (
+              <>
+                <div style={{ marginTop: 20, borderTop: '1px solid #f1f5f9', paddingTop: 16 }}>
+                  <button
+                    onClick={() => setFeedbackOpen(true)}
+                    style={{
+                      padding: '6px 14px', background: '#f8fafc', border: '1px solid #e2e8f0',
+                      borderRadius: 6, fontSize: 13, color: '#475569', cursor: 'pointer',
+                    }}
+                  >
+                    문제 보고 / 개선 제안
+                  </button>
+                </div>
+                <DownloadSection assetId={id} />
+              </>
+            )}
           </div>
         )}
       </div>
+
+      {feedbackOpen && id && (
+        <FeedbackModal assetId={id} onClose={() => setFeedbackOpen(false)} />
+      )}
     </div>
   )
 }

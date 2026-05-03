@@ -2,7 +2,7 @@ import { Hono } from 'hono'
 import { sqlite } from '@team-claude/db/client'
 import { requireAuth } from '../middleware/auth.js'
 import { assetListQuerySchema, assetIdParamSchema, createAssetSchema, updateAssetSchema, statusTransitionSchema } from '../schemas/asset.js'
-import { listAssets, getAssetById, getAssetStats } from '../services/assetQueryService.js'
+import { listAssets, getAssetById, getAssetStats, getTags } from '../services/assetQueryService.js'
 import { buildFts5Query } from '../services/searchService.js'
 import { createAsset, updateAsset } from '../services/assetWriteService.js'
 import { transitionStatus, submitForReview } from '../services/assetStatusService.js'
@@ -194,6 +194,12 @@ assetsRoute.patch('/:id/status', async (c) => {
       500,
     )
   }
+})
+
+// GET /assets/tags — DISTINCT 태그 목록 + count (U-Mj-3, D-11 정합: literal before /:id)
+assetsRoute.get('/tags', (c) => {
+  const tags = getTags(sqlite)
+  return c.json({ ok: true, data: tags })
 })
 
 // GET /assets/:id/download — 자산 type별 다운로드 정보 (M5 영역 #2)

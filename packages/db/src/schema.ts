@@ -125,19 +125,41 @@ export const usageEvents = sqliteTable('usage_events', {
   typeTsIdx:      index('idx_events_type_ts').on(t.eventType, t.ts),
 }))
 
-// ── feedback ────────────────────────────────────────────────────────────────
+// ── feedback v2 (migration 014 — D-8 정합, 005 schema 재구성) ───────────────
 export const feedback = sqliteTable('feedback', {
-  id:        text('id').primaryKey().$defaultFn(uuid),
-  assetId:   text('asset_id')
-               .notNull()
-               .references(() => assets.id, { onDelete: 'cascade' }),
-  userId:    text('user_id').notNull(),
-  rating:    integer('rating').notNull(),
-  comment:   text('comment'),
-  createdAt: integer('created_at', { mode: 'timestamp' }).notNull().default(now),
+  id:           text('id').primaryKey().$defaultFn(uuid),
+  userId:       text('user_id').notNull().references(() => users.id),
+  assetId:      text('asset_id').references(() => assets.id),  // nullable: S10 시스템 피드백
+  feedbackType: text('feedback_type', {
+                  enum: ['bug_report', 'improvement', 'system_feedback'],
+                }).notNull(),
+  content:      text('content').notNull(),
+  status:       text('status', {
+                  enum: ['open', 'in_progress', 'resolved', 'wontfix'],
+                }).notNull().default('open'),
+  createdAt:    integer('created_at').notNull().default(sql`(unixepoch())`),
 }, (t) => ({
-  userAssetIdx: uniqueIndex('uq_feedback_user_asset').on(t.assetId, t.userId),
-  assetIdx:     index('idx_feedback_asset').on(t.assetId),
+  userIdx:   index('idx_feedback_user').on(t.userId, t.createdAt),
+  assetIdx:  index('idx_feedback_asset').on(t.assetId, t.createdAt),
+  statusIdx: index('idx_feedback_status').on(t.status, t.createdAt),
+}))
+
+// ── notifications (migration 013 — U-Mj-2, D-7 정합) ────────────────────────
+export const notifications = sqliteTable('notifications', {
+  id:        text('id').primaryKey().$defaultFn(uuid),
+  userId:    text('user_id').notNull().references(() => users.id),
+  eventType: text('event_type', {
+               enum: ['review_approved', 'review_rejected', 'asset_published'],
+             }).notNull(),
+  assetId:   text('asset_id').references(() => assets.id),
+  metadata:  text('metadata', { mode: 'json' })
+               .$type<Record<string, unknown>>()
+               .notNull()
+               .default(sql`'{}'`),
+  readAt:    integer('read_at'),
+  createdAt: integer('created_at').notNull().default(sql`(unixepoch())`),
+}, (t) => ({
+  userCreatedIdx: index('idx_notifications_user_created').on(t.userId, t.createdAt),
 }))
 
 // ── daily_asset_stats (T-26) ────────────────────────────────────────────────

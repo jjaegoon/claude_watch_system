@@ -49,6 +49,24 @@ export type AssetStats = {
   download_count: number
 }
 
+export type TagRow = { tag: string; count: number }
+
+/**
+ * 승인된 자산의 DISTINCT 태그 목록 + 자산 수 집계 (U-Mj-3).
+ * gotcha #18: compound ORDER BY 의무 — count DESC, tag ASC
+ */
+export const getTags = (db: InstanceType<typeof Database>): TagRow[] => {
+  return db.prepare(`
+    SELECT t.value AS tag, COUNT(DISTINCT a.id) AS count
+    FROM assets a, json_each(a.tags) AS t
+    WHERE a.status = 'approved'
+      AND t.value IS NOT NULL
+      AND t.value != ''
+    GROUP BY t.value
+    ORDER BY count DESC, t.value ASC
+  `).all() as TagRow[]
+}
+
 /** asset_view + asset_download 이벤트 집계 (T-46). */
 export const getAssetStats = (
   assetId: string,
@@ -98,7 +116,7 @@ export const listAssets = async (
   role: UserRole,
   db: InstanceType<typeof Database>,
 ): Promise<ListResult> => {
-  const { q, type, status, limit = 20, cursor, sort = 'updated_at' } = query
+  const { q, type, status, tag, limit = 20, cursor, sort = 'updated_at' } = query
 
   // FTS5 검색 쿼리 빌드
   const ftsQuery = q ? buildFts5Query(q) : ''
@@ -140,35 +158,59 @@ export const listAssets = async (
     params.push(status)
   }
 
-  // cursor 페이지네이션
+  // tag 필터 (U-Mj-3: json_each 서브쿼리)
+  if (tag) {
+    conditions.push('EXISTS (SELECT 1 FROM json_each(a.tags) WHERE value = ?)')
+    params.push(tag)
+  }
+
+  // cursor 페이지네이션 (gotcha #18: compound ORDER BY 정합)
+  const isCountSort = sort === 'view_count' || sort === 'download_count'
   if (cur) {
-    if (sort === 'updated_at') {
+    if (sort === 'updated_at' || sort === 'last_updated') {
       conditions.push('(a.updated_at < ? OR (a.updated_at = ? AND a.id < ?))')
       params.push(cur.updated_at, cur.updated_at, cur.id)
     } else {
-      // name 정렬 시 cursor는 id 기반
+      // name·view_count·download_count: id 기반 cursor (D-10 정합)
       conditions.push('a.id < ?')
       params.push(cur.id)
     }
   }
 
   const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
-  const orderBy = sort === 'updated_at' ? 'a.updated_at DESC, a.id DESC' : 'a.name ASC, a.id ASC'
+
+  // SELECT + ORDER BY (gotcha #18: 모든 ORDER BY compound 정합)
+  let selectSql: string
+  let orderBy: string
+
+  if (isCountSort) {
+    const eventType = sort === 'view_count' ? 'asset_view' : 'asset_download'
+    selectSql = `
+      SELECT a.id, a.type, a.name, a.description, a.tags,
+             a.author_id AS authorId, a.version, a.status,
+             a.source_path AS sourcePath, a.type_fields AS typeFields,
+             a.created_at AS createdAt, a.updated_at AS updatedAt,
+             (SELECT COUNT(*) FROM usage_events ue
+              WHERE ue.asset_id = a.id AND ue.event_type = '${eventType}') AS sort_count
+      FROM assets a
+      ${where}`
+    orderBy = 'sort_count DESC, a.id DESC'
+  } else {
+    selectSql = `
+      SELECT a.id, a.type, a.name, a.description, a.tags,
+             a.author_id AS authorId, a.version, a.status,
+             a.source_path AS sourcePath, a.type_fields AS typeFields,
+             a.created_at AS createdAt, a.updated_at AS updatedAt
+      FROM assets a
+      ${where}`
+    orderBy = (sort === 'name') ? 'a.name ASC, a.id ASC' : 'a.updated_at DESC, a.id DESC'
+  }
 
   // limit+1 조회로 next_cursor 존재 여부 확인
-  const sql = `
-    SELECT a.id, a.type, a.name, a.description, a.tags,
-           a.author_id AS authorId, a.version, a.status,
-           a.source_path AS sourcePath, a.type_fields AS typeFields,
-           a.created_at AS createdAt, a.updated_at AS updatedAt
-    FROM assets a
-    ${where}
-    ORDER BY ${orderBy}
-    LIMIT ?
-  `
+  const sql = `${selectSql} ORDER BY ${orderBy} LIMIT ?`
   params.push(limit + 1)
 
-  const rows = db.prepare(sql).all(...params) as AssetRow[]
+  const rows = db.prepare(sql).all(...params) as (AssetRow & { sort_count?: number })[]
 
   let nextCursor: string | null = null
   if (rows.length > limit) {
@@ -179,5 +221,8 @@ export const listAssets = async (
     }
   }
 
-  return { items: rows, nextCursor }
+  // sort_count 컬럼은 내부 정렬용 — 응답에서 제외
+  const items: AssetRow[] = rows.map(({ sort_count: _sc, ...rest }) => rest)
+
+  return { items, nextCursor }
 }

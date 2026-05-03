@@ -153,6 +153,25 @@ export const transitionStatus = (
     )
   })()
 
+  // U-Mj-2: notification hook (transaction 외부 fire-and-forget)
+  const authorId = existing.authorId
+  if (authorId) {
+    const shouldNotify = newStatus === 'approved' ||
+      (existing.status === 'in_review' && newStatus === 'draft')
+    if (shouldNotify) {
+      const notifEventType = newStatus === 'approved' ? 'review_approved' : 'review_rejected'
+      try {
+        db.prepare(`
+          INSERT INTO notifications (id, user_id, event_type, asset_id, metadata, created_at)
+          VALUES (?, ?, ?, ?, ?, unixepoch())
+        `).run(
+          crypto.randomUUID(), authorId, notifEventType, assetId,
+          JSON.stringify({ actor_id: userId, reason_code: opts?.reasonCode ?? null }),
+        )
+      } catch { /* fire-and-forget */ }
+    }
+  }
+
   return { ok: true, asset: db.prepare(FETCH_SQL).get(assetId) as AssetRow }
 }
 

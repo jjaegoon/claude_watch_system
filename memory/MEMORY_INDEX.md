@@ -22,10 +22,10 @@
 
 직전 5개 에피소드만 자동 임포트. 6개 이상 누적 시 오래된 것은 archive.
 
+@./episodes/2026-05-03_M6.md
+@./episodes/2026-05-03_R-G9_hotfix.md
+@./episodes/2026-05-03_Phase-O_hotfix.md
+@./episodes/2026-05-03_M5.md
 @./episodes/2026-05-03_M4.md
-@./episodes/2026-05-02_M3.md
-@./episodes/2026-05-02_M2.md
-@./episodes/2026-05-02_M1_Step8.md
-@./episodes/2026-05-02_M1_Step7.md
 
 <!-- 다음 에피소드 추가 시 위에서부터 5개만 유지하고 나머지는 episodes/archive/로 이동. -->
