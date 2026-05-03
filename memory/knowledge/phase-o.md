@@ -38,6 +38,15 @@ pnpm --filter @team-claude/api test  # regression baseline 대비 -5% 이상 시
 - 모델: Opus + ultrathink
 - 입력: 운영 데이터 누적 + Self-improve 18건 + Phase B 자율 발견 패턴
 - 최초 실행: ~2026-07-30
+- **R-G10 결정 (2026-05-03)**: 옵션 B 채택 — 2026-07-30 quarterly-human-persona-review에 통합. 비개발자 페르소나(PM·디자이너·기획자) 시각은 해당 라운드에서 M6 사용자 경험 레이어 포함 검증.
+
+## M6 페르소나 검토 결과 (Phase O, 2026-05-03)
+
+Cowork R-G9 외부 검토 ★★★★★ — 8항목 전체 PASS.
+- C-1 ★★★★★: 타인 알림 차단 `WHERE id=? AND user_id=?` 자율 발견 정점
+- T-47 ADR 등재: table recreation 표준 패턴 (migration 011·012·014 누적 3회)
+- 결손 매트릭스 47% 정점 (U-Mj-1·2·3·5 + S10 = 5건 정합 회복)
+- R-G10: 옵션 B 채택 — 2026-07-30 quarterly 통합
 
 ## 자체 페르소나 검토 결과 (Phase B 종료 시점, 2026-05-03)
 
