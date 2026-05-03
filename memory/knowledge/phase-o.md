@@ -32,7 +32,7 @@ curl -s http://localhost:3000/health | jq .  # status: ok 확인 (서버 실행 
 ```bash
 pnpm --filter @team-claude/api test  # regression baseline 대비 -5% 이상 시 self-improve 트리거
 ```
-최초 baseline: 171 PASS (2026-05-03). `evals/regression_test.py` 실행 의무.
+최초 baseline: 171 PASS (2026-05-03). M5 이후: 184 PASS. Hotfix: 196 PASS. **M6 이후: 211 PASS (2026-05-03)**. `evals/regression_test.py` 실행 의무.
 
 ### 분기 인간 페르소나 (T-36)
 - 모델: Opus + ultrathink
@@ -56,6 +56,7 @@ SRE: Risk 2건 (Phase O 수용)
 |----|------|---------|
 | T-39a | BetterStack AbortSignal.timeout(5000) | Low |
 | T-39b | precommit staged_secrets FAIL on git-rm deletions 정식 fix | Low |
+| T-39c | gate_check.sh M5 지원 추가 (현재 B-1·B-2·M2·M1·M3·M4만 정의) | Low |
 | T-44 (후보) | daily_stats backfill 로직 (downtime 복구) | Low |
 
 ## Phase 2 진입 검토 (D+90+ 보류)

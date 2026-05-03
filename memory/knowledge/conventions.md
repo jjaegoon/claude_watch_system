@@ -28,6 +28,7 @@ CLAUDE.md (Obsidian 프로젝트 디렉터리)의 코드 스타일을 압축.
 - 001~007: 직접 수정 금지 (settings.json deny). 새 변경은 008+
 - 항상 idempotent: `CREATE TABLE IF NOT EXISTS`, `CREATE INDEX IF NOT EXISTS`
 - FTS5 트리거는 마이그레이션과 함께 (T-19)
+- **T-47 (table recreation 표준 패턴)**: SQLite schema 본질 변경(CHECK enum 추가·컬럼 타입 변경·NOT NULL 제약 추가 등) = `CREATE TABLE new → INSERT FROM old → DROP old → RENAME new` 4단계 의무. `ALTER TABLE ADD COLUMN`은 nullable 컬럼 추가에만 허용. 누적 적용: migration 011·012(usage_events) + 014(feedback) — 3회 검증됨.
 - **DB connection 분리 시(worker 등) PRAGMA 재설정 의무** (T-19 + gotcha #8) — `busy_timeout`·`foreign_keys`는 connection-scoped이므로 새 connection을 여는 모든 코드(M2 webhook worker·M3 usage_events flush worker·CLI 등)는 client.ts와 동일한 4 PRAGMA(`journal_mode=WAL`·`busy_timeout=5000`·`synchronous=NORMAL`·`foreign_keys=ON`) set 필수.
 
 ## React (apps/web)
